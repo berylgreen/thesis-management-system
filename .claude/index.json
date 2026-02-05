@@ -1,0 +1,229 @@
+{
+  "project_name": "毕业论文管理系统 - 精简版",
+  "scan_timestamp": "2026-01-30T13:48:33+08:00",
+  "version": "1.0.0",
+  "scanner": "claude-architect-v1",
+  "metadata": {
+    "total_files": 48,
+    "scanned_files": 23,
+    "coverage_percentage": 47.92,
+    "ignored_files": 25,
+    "truncated": false
+  },
+  "ignore_rules": [
+    "node_modules/**",
+    ".git/**",
+    "dist/**",
+    "target/**",
+    "*.lock",
+    "*.log",
+    ".idea/**",
+    ".vscode/**",
+    "uploads/**"
+  ],
+  "modules": [
+    {
+      "path": "backend",
+      "language": "Java 17",
+      "type": "Spring Boot Application",
+      "entry_point": "src/main/java/com/thesis/ThesisApplication.java",
+      "framework": "Spring Boot 3.2.1",
+      "key_files": {
+        "config": [
+          "pom.xml",
+          "src/main/resources/application.yml",
+          "Dockerfile"
+        ],
+        "controllers": [
+          "src/main/java/com/thesis/controller/AuthController.java",
+          "src/main/java/com/thesis/controller/ThesisController.java",
+          "src/main/java/com/thesis/controller/ReviewController.java",
+          "src/main/java/com/thesis/controller/DiffController.java"
+        ],
+        "services": [
+          "src/main/java/com/thesis/service/UserService.java",
+          "src/main/java/com/thesis/service/ThesisService.java",
+          "src/main/java/com/thesis/service/ReviewService.java"
+        ],
+        "entities": [
+          "src/main/java/com/thesis/entity/User.java",
+          "src/main/java/com/thesis/entity/Thesis.java",
+          "src/main/java/com/thesis/entity/ThesisVersion.java",
+          "src/main/java/com/thesis/entity/Review.java"
+        ],
+        "mappers": [
+          "src/main/java/com/thesis/mapper/UserMapper.java",
+          "src/main/java/com/thesis/mapper/ThesisMapper.java",
+          "src/main/java/com/thesis/mapper/ThesisVersionMapper.java",
+          "src/main/java/com/thesis/mapper/ReviewMapper.java"
+        ],
+        "security": [
+          "src/main/java/com/thesis/config/SecurityConfig.java",
+          "src/main/java/com/thesis/config/JwtAuthenticationFilter.java",
+          "src/main/java/com/thesis/util/JwtUtil.java"
+        ],
+        "utils": [
+          "src/main/java/com/thesis/util/Result.java",
+          "src/main/java/com/thesis/util/DiffUtil.java"
+        ]
+      },
+      "dependencies": {
+        "spring-boot": "3.2.1",
+        "mybatis-plus": "3.5.5",
+        "jjwt": "0.12.5",
+        "java-diff-utils": "4.12"
+      },
+      "api_endpoints": [
+        "POST /api/auth/register",
+        "POST /api/auth/login",
+        "POST /api/thesis/create",
+        "POST /api/thesis/{id}/upload",
+        "GET /api/thesis/my",
+        "GET /api/thesis/{id}/versions",
+        "GET /api/thesis/version/{id}/download",
+        "POST /api/review/create",
+        "GET /api/review/version/{id}",
+        "GET /api/review/my",
+        "GET /api/diff/compare"
+      ],
+      "test_directory": null,
+      "has_tests": false,
+      "coverage_gaps": [
+        "缺少单元测试",
+        "缺少集成测试",
+        "缺少全局异常处理器",
+        "JWT 密钥硬编码（安全风险）"
+      ]
+    },
+    {
+      "path": "frontend",
+      "language": "JavaScript/Vue 3",
+      "type": "SPA (Single Page Application)",
+      "entry_point": "src/main.js",
+      "framework": "Vue 3.4 + Vite 5.0",
+      "key_files": {
+        "config": [
+          "package.json",
+          "vite.config.js",
+          "nginx.conf",
+          "Dockerfile"
+        ],
+        "views": [
+          "src/views/Login.vue",
+          "src/views/Home.vue",
+          "src/views/ThesisList.vue",
+          "src/views/ThesisDetail.vue"
+        ],
+        "api": [
+          "src/api/auth.js",
+          "src/api/thesis.js"
+        ],
+        "router": [
+          "src/router/index.js"
+        ],
+        "store": [
+          "src/store/user.js"
+        ],
+        "utils": [
+          "src/utils/request.js"
+        ]
+      },
+      "dependencies": {
+        "vue": "^3.4.15",
+        "vue-router": "^4.2.5",
+        "pinia": "^2.1.7",
+        "axios": "^1.6.5",
+        "element-plus": "^2.5.4",
+        "vite": "^5.0.11"
+      },
+      "routes": [
+        "/login",
+        "/",
+        "/thesis",
+        "/thesis/:id"
+      ],
+      "test_directory": null,
+      "has_tests": false,
+      "coverage_gaps": [
+        "缺少单元测试",
+        "缺少 E2E 测试",
+        "缺少代码规范工具（ESLint）",
+        "Token 持久化方案未明确"
+      ]
+    },
+    {
+      "path": "sql",
+      "language": "SQL",
+      "type": "Database Schema",
+      "entry_point": "init.sql",
+      "key_files": {
+        "schema": [
+          "init.sql"
+        ]
+      },
+      "database_tables": [
+        "t_user",
+        "t_thesis",
+        "t_thesis_version",
+        "t_review"
+      ]
+    },
+    {
+      "path": "docs",
+      "language": "Markdown",
+      "type": "Documentation",
+      "key_files": {
+        "plans": [
+          "ai_plans/2026-01-09_thesis_system_plan_lite.md",
+          "ai_plans/2026-01-09_thesis_system_plan.md"
+        ]
+      }
+    }
+  ],
+  "architecture": {
+    "type": "Monolithic",
+    "deployment": "Docker Compose",
+    "services": [
+      "MySQL 8.0",
+      "Redis 7.0",
+      "Backend (Spring Boot)",
+      "Frontend (Nginx)"
+    ]
+  },
+  "next_steps": {
+    "priority_high": [
+      "添加后端单元测试（Service 层）",
+      "更换 JWT 密钥为环境变量",
+      "添加全局异常处理器（@ControllerAdvice）"
+    ],
+    "priority_medium": [
+      "添加前端单元测试（Vitest）",
+      "配置 ESLint + Prettier",
+      "完善 API 文档（SpringDoc）"
+    ],
+    "priority_low": [
+      "文件存储迁移到对象存储",
+      "添加操作日志（AOP）",
+      "性能优化（Redis 缓存）"
+    ]
+  },
+  "gaps": {
+    "missing_tests": [
+      "backend: 无单元测试和集成测试",
+      "frontend: 无组件测试和 E2E 测试"
+    ],
+    "missing_docs": [
+      "API 接口文档（建议集成 SpringDoc/Swagger）"
+    ],
+    "security_concerns": [
+      "JWT 密钥硬编码",
+      "文件上传未验证文件类型",
+      "缺少 CORS 配置"
+    ],
+    "configuration_issues": [
+      "生产环境配置未分离（application-prod.yml）",
+      "数据库连接池未配置",
+      "日志级别未配置"
+    ]
+  }
+}
