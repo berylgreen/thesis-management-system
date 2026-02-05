@@ -10,10 +10,10 @@
             </el-button>
             <el-button
               type="success"
-              :disabled="selectedVersions.length !== 2"
+              :disabled="selectedVersions.length === 0 || selectedVersions.length > 2"
               @click="showCompareDialog = true"
             >
-              对比所选版本 ({{ selectedVersions.length }}/2)
+              查看与对比 ({{ selectedVersions.length }}/2)
             </el-button>
           </div>
         </div>
@@ -84,11 +84,12 @@
       destroy-on-close
     >
       <VersionComparer
-        v-if="showCompareDialog && selectedVersions.length === 2"
-        :version1-id="sortedSelectedVersions[1].id"
+        v-if="showCompareDialog && selectedVersions.length >= 1"
+        :version1-id="sortedSelectedVersions.length >= 2 ? sortedSelectedVersions[1].id : null"
         :version2-id="sortedSelectedVersions[0].id"
-        :original-file-name="sortedSelectedVersions[1].filePath"
+        :original-file-name="sortedSelectedVersions.length >= 2 ? sortedSelectedVersions[1].filePath : ''"
         :revised-file-name="sortedSelectedVersions[0].filePath"
+        :single-view-mode="selectedVersions.length === 1"
       />
     </el-dialog>
   </div>
@@ -117,9 +118,10 @@ const uploadForm = ref({ remark: '' })
 const uploadFile = ref(null)
 const loading = ref(false)
 
-// 对选择的版本进行排序：[新版本, 旧版本]
+// 对选择的版本进行排序：[新版本, 旧版本]（支持单版本模式）
 const sortedSelectedVersions = computed(() => {
-  if (selectedVersions.value.length !== 2) return []
+  if (selectedVersions.value.length === 0) return []
+  if (selectedVersions.value.length === 1) return [selectedVersions.value[0]]
   return [...selectedVersions.value].sort((a, b) => {
     // 先按创建时间比
     if (a.createdAt !== b.createdAt) {

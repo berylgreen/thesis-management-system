@@ -211,6 +211,75 @@ public class ThesisService {
         }
     }
 
+    /**
+     * 带权限校验的单版本内容获取
+     * @param versionId 版本 ID
+     * @param currentUserId 当前用户ID
+     * @param role 当前用户角色
+     * @return 版本内容结果（包含文档内容块）
+     */
+    public VersionContentResult getVersionContentWithAuth(
+            Long versionId, Long currentUserId, String role) {
+
+        // 0. 认证校验
+        if (currentUserId == null || role == null) {
+            throw new ForbiddenException("用户未认证");
+        }
+
+        // 1. 参数校验
+        if (versionId == null) {
+            throw new BadRequestException("版本ID不能为空");
+        }
+
+        // 2. 加载版本
+        ThesisVersion version = thesisVersionMapper.selectById(versionId);
+        if (version == null) {
+            throw new NotFoundException("版本不存在");
+        }
+
+        // 3. 加载论文
+        Thesis thesis = thesisMapper.selectById(version.getThesisId());
+        if (thesis == null) {
+            throw new NotFoundException("论文不存在");
+        }
+
+        // 4. 权限校验（仅允许STUDENT和TEACHER角色）
+        if ("STUDENT".equals(role)) {
+            if (!thesis.getStudentId().equals(currentUserId)) {
+                throw new ForbiddenException("无权访问他人论文");
+            }
+        } else if ("TEACHER".equals(role)) {
+            // 教师可以访问所有论文
+        } else {
+            // 其他角色一律拒绝
+            throw new ForbiddenException("角色无权限执行此操作");
+        }
+
+        // 5. 读取文档内容
+        try {
+            List<DiffUtil.ContentBlock> blocks = diffUtil.readDocxAsContentBlocks(version.getFilePath());
+            VersionContentResult result = new VersionContentResult();
+            result.setBlocks(blocks);
+            result.setFileName(extractDisplayFileName(version.getFilePath()));
+            return result;
+        } catch (IOException e) {
+            throw new RuntimeException("读取文档失败", e);
+        }
+    }
+
+    /**
+     * 单版本内容返回结果
+     */
+    public static class VersionContentResult {
+        private List<DiffUtil.ContentBlock> blocks;
+        private String fileName;
+
+        public List<DiffUtil.ContentBlock> getBlocks() { return blocks; }
+        public void setBlocks(List<DiffUtil.ContentBlock> blocks) { this.blocks = blocks; }
+        public String getFileName() { return fileName; }
+        public void setFileName(String fileName) { this.fileName = fileName; }
+    }
+
     private String extractDisplayFileName(String filePath) {
         if (filePath == null || filePath.isEmpty()) {
             return "";

@@ -15,8 +15,8 @@
       <!-- 完整内容视图（新增） -->
       <el-tab-pane label="完整内容" name="full-content">
         <div class="full-content-view">
-          <!-- 统计摘要 (已合并) -->
-          <el-row :gutter="20" style="padding: 0 0 20px 0">
+          <!-- 统计摘要 (仅对比模式显示) -->
+          <el-row v-if="!isSingleView" :gutter="20" style="padding: 0 0 20px 0">
             <el-col :span="6">
               <el-statistic title="新增行数" :value="summary.added" />
             </el-col>
@@ -31,8 +31,8 @@
             </el-col>
           </el-row>
 
-          <!-- 高亮开关和导航栏 -->
-          <div class="highlight-toggle">
+          <!-- 高亮开关和导航栏 (仅对比模式显示) -->
+          <div v-if="!isSingleView" class="highlight-toggle">
             <el-switch
               v-model="highlightDiff"
               active-text="高亮差异"
@@ -57,9 +57,9 @@
             </div>
           </div>
           <el-row :gutter="20">
-            <!-- 日期新的放在左边 (Revised/新版本) -->
-            <el-col :span="isMobile || !highlightDiff ? 24 : 12">
-              <h4 class="version-title" :title="formattedRevisedFileName">新版本: {{ formattedRevisedFileName || '新版本' }}</h4>
+            <!-- 日期新的放在左边 (Revised/新版本，单版本模式显示"文档内容") -->
+            <el-col :span="isSingleView || isMobile || !highlightDiff ? 24 : 12">
+              <h4 class="version-title" :title="formattedRevisedFileName">{{ isSingleView ? '文档内容' : '新版本' }}: {{ formattedRevisedFileName || (isSingleView ? '' : '新版本') }}</h4>
               <div 
                 class="content-blocks-container" 
                 :class="{ 'normal-view-container': !highlightDiff && !isMobile }"
@@ -87,8 +87,8 @@
               </div>
             </el-col>
 
-            <!-- 旧版本放在右边 (Original/旧版本) -->
-            <el-col v-if="highlightDiff && !isMobile" :span="12">
+            <!-- 旧版本放在右边 (Original/旧版本) - 单版本模式不显示 -->
+            <el-col v-if="!isSingleView && highlightDiff && !isMobile" :span="12">
               <h4 class="version-title" :title="formattedOriginalFileName">旧版本: {{ formattedOriginalFileName || '旧版本' }}</h4>
               <div class="content-blocks-container" ref="originalBlocksContainer" @scroll="onOriginalScroll">
                 <div
@@ -115,8 +115,8 @@
         </div>
       </el-tab-pane>
 
-      <!-- 并排对比（仅桌面端） -->
-      <el-tab-pane v-if="!isMobile" label="文本对比" name="side-by-side">
+      <!-- 并排对比（仅桌面端 + 非单版本模式） -->
+      <el-tab-pane v-if="!isSingleView && !isMobile" label="文本对比" name="side-by-side">
         <div class="diff-view-wrapper">
           <div v-html="sideBySideHtml" class="diff-container" ref="sideBySideContainer"></div>
 
@@ -145,8 +145,8 @@
         </div>
       </el-tab-pane>
 
-      <!-- 合并视图 -->
-      <el-tab-pane label="合并视图" name="unified">
+      <!-- 合并视图（仅对比模式显示） -->
+      <el-tab-pane v-if="!isSingleView" label="合并视图" name="unified">
         <div class="diff-view-wrapper">
           <div v-html="unifiedHtml" class="diff-container" ref="unifiedContainer"></div>
 
@@ -180,7 +180,7 @@
 
 <script setup>
 import { ref, onMounted, computed, onUnmounted } from 'vue'
-import { getDiff } from '@/api/thesis'
+import { getDiff, getVersionContent } from '@/api/thesis'
 import * as Diff2Html from 'diff2html'
 import 'diff2html/bundles/css/diff2html.min.css'
 import DiffMatchPatch from 'diff-match-patch'
@@ -188,7 +188,8 @@ import DiffMatchPatch from 'diff-match-patch'
 const props = defineProps({
   version1Id: {
     type: [String, Number],
-    required: true
+    required: false,  // 单版本查看模式不需要 version1
+    default: null
   },
   version2Id: {
     type: [String, Number],
@@ -201,8 +202,15 @@ const props = defineProps({
   revisedFileName: {
     type: String,
     default: ''
+  },
+  singleViewMode: {
+    type: Boolean,
+    default: false  // 单版本查看模式
   }
 })
+
+// 是否为单版本查看模式
+const isSingleView = computed(() => props.singleViewMode || !props.version1Id)
 
 // 格式化文件名：移除 UUID 前缀
 const formattedOriginalFileName = computed(() => formatFileName(props.originalFileName))
@@ -636,26 +644,41 @@ function formatFileName(fileName) {
 // 数据获取
 async function fetchData() {
   try {
-    const res = await getDiff(props.version1Id, props.version2Id)
-    fullDiffData.value = res.data
-
-    if (!fullDiffData.value || !fullDiffData.value.diffs || fullDiffData.value.diffs.length === 0) {
-      // 即使没有文本差异，也可能有内容要显示
-      if (fullDiffData.value?.originalBlocks?.length > 0 || fullDiffData.value?.revisedBlocks?.length > 0) {
-        originalBlocks.value = fullDiffData.value.originalBlocks || []
-        revisedBlocks.value = fullDiffData.value.revisedBlocks || []
-        buildParagraphMatching() // 构建智能段落匹配
-        activeTab.value = 'full-content'
+    // 单版本查看模式：仅获取单个版本的内容
+    if (isSingleView.value) {
+      const res = await getVersionContent(props.version2Id)
+      const data = res.data
+      
+      if (!data || !data.blocks || data.blocks.length === 0) {
+        error.value = '文档内容为空'
       } else {
-        error.value = '两个版本无差异'
+        revisedBlocks.value = data.blocks || []
+        originalBlocks.value = []  // 单版本模式没有原始版本
+        activeTab.value = 'full-content'
       }
     } else {
-      backendData.value = fullDiffData.value.diffs
-      originalBlocks.value = fullDiffData.value.originalBlocks || []
-      revisedBlocks.value = fullDiffData.value.revisedBlocks || []
-      buildDiffPositionMap(fullDiffData.value.diffs) // 构建差异位置索引
-      buildParagraphMatching() // 构建智能段落匹配
-      renderDiffs()
+      // 对比模式：获取两个版本的差异
+      const res = await getDiff(props.version1Id, props.version2Id)
+      fullDiffData.value = res.data
+
+      if (!fullDiffData.value || !fullDiffData.value.diffs || fullDiffData.value.diffs.length === 0) {
+        // 即使没有文本差异，也可能有内容要显示
+        if (fullDiffData.value?.originalBlocks?.length > 0 || fullDiffData.value?.revisedBlocks?.length > 0) {
+          originalBlocks.value = fullDiffData.value.originalBlocks || []
+          revisedBlocks.value = fullDiffData.value.revisedBlocks || []
+          buildParagraphMatching() // 构建智能段落匹配
+          activeTab.value = 'full-content'
+        } else {
+          error.value = '两个版本无差异'
+        }
+      } else {
+        backendData.value = fullDiffData.value.diffs
+        originalBlocks.value = fullDiffData.value.originalBlocks || []
+        revisedBlocks.value = fullDiffData.value.revisedBlocks || []
+        buildDiffPositionMap(fullDiffData.value.diffs) // 构建差异位置索引
+        buildParagraphMatching() // 构建智能段落匹配
+        renderDiffs()
+      }
     }
   } catch (e) {
     error.value = '数据加载失败：' + (e.response?.data?.message || e.message)

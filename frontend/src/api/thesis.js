@@ -49,6 +49,15 @@ export function getDiff(version1Id, version2Id) {
   })
 }
 
+// 获取单个版本的文档内容（用于单版本查看模式）
+export function getVersionContent(versionId) {
+  return request({
+    url: '/diff/content',
+    method: 'get',
+    params: { versionId }
+  })
+}
+
 export function forceSync() {
   return request({
     url: '/thesis/admin/force-sync',

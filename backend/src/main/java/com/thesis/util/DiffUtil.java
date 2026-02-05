@@ -125,7 +125,7 @@ public class DiffUtil {
     /**
      * 读取 DOCX 文件为富文本内容块列表（包含文本、表格、图片）
      */
-    private List<ContentBlock> readDocxAsContentBlocks(String filePath) throws IOException {
+    public List<ContentBlock> readDocxAsContentBlocks(String filePath) throws IOException {
         List<ContentBlock> blocks = new ArrayList<>();
         
         if (!filePath.toLowerCase().endsWith(".docx")) {
