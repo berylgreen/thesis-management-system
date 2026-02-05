@@ -58,6 +58,10 @@ public class ThesisService {
         return thesis;
     }
 
+    public Thesis getThesisById(Long id) {
+        return thesisMapper.selectById(id);
+    }
+
     @Transactional
     public ThesisVersion uploadVersion(Long thesisId, MultipartFile file, String remark) throws IOException {
         Thesis thesis = thesisMapper.selectById(thesisId);

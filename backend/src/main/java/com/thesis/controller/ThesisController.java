@@ -41,6 +41,19 @@ public class ThesisController {
         }
     }
 
+    @GetMapping("/{thesisId}")
+    public Result<Thesis> getThesis(@PathVariable Long thesisId) {
+        try {
+            Thesis thesis = thesisService.getThesisById(thesisId);
+            if (thesis == null) {
+                return Result.error("论文不存在");
+            }
+            return Result.success(thesis);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     @PostMapping("/{thesisId}/upload")
     public Result<ThesisVersion> uploadVersion(
             @PathVariable Long thesisId,

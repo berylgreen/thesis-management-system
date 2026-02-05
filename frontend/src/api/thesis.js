@@ -7,6 +7,13 @@ export function getMyTheses() {
   })
 }
 
+export function getThesis(id) {
+  return request({
+    url: `/thesis/${id}`,
+    method: 'get'
+  })
+}
+
 export function createThesis(title) {
   return request({
     url: '/thesis/create',
