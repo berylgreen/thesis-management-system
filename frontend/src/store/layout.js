@@ -1,26 +1,25 @@
-import { defineStore } from 'pinia';
+import { defineStore } from 'pinia'
 
 export const useLayoutStore = defineStore('layout', {
   state: () => ({
     isSidebarCollapsed: false,
-    isMobile: false,
-    mobileBreakpoint: 768,
+    recentTheses: JSON.parse(localStorage.getItem('recentTheses') || '[]')
   }),
-  getters: {
-    sidebarWidth(state) {
-      if (state.isMobile) return '0';
-      return state.isSidebarCollapsed ? '64px' : '220px';
-    },
-  },
   actions: {
     toggleSidebar() {
-      this.isSidebarCollapsed = !this.isSidebarCollapsed;
+      this.isSidebarCollapsed = !this.isSidebarCollapsed
     },
-    checkIsMobile(width) {
-      this.isMobile = width < this.mobileBreakpoint;
-      if (this.isMobile) {
-        this.isSidebarCollapsed = true;
+    addRecentThesis(thesis) {
+      if (!thesis.id || !thesis.title) return
+      const existingIndex = this.recentTheses.findIndex(t => t.id === thesis.id)
+      if (existingIndex !== -1) {
+        this.recentTheses.splice(existingIndex, 1)
       }
-    },
-  },
-});
+      this.recentTheses.unshift({ id: thesis.id, title: thesis.title })
+      if (this.recentTheses.length > 3) {
+        this.recentTheses.pop()
+      }
+      localStorage.setItem('recentTheses', JSON.stringify(this.recentTheses))
+    }
+  }
+})
