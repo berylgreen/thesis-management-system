@@ -118,7 +118,9 @@ public class ThesisService {
 
     public List<ThesisVersion> getThesisVersions(Long thesisId) {
         LambdaQueryWrapper<ThesisVersion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ThesisVersion::getThesisId, thesisId).orderByDesc(ThesisVersion::getVersionNum);
+        wrapper.eq(ThesisVersion::getThesisId, thesisId)
+               .orderByDesc(ThesisVersion::getCreatedAt)
+               .orderByDesc(ThesisVersion::getVersionNum);
         return thesisVersionMapper.selectList(wrapper);
     }
 
@@ -191,6 +193,8 @@ public class ThesisService {
             emptyResult.setDiffs(Collections.emptyList());
             emptyResult.setOriginalLines(Collections.emptyList());
             emptyResult.setRevisedLines(Collections.emptyList());
+            emptyResult.setOriginalFileName(extractDisplayFileName(v1.getFilePath()));
+            emptyResult.setRevisedFileName(extractDisplayFileName(v2.getFilePath()));
             return emptyResult;
         }
 
@@ -198,10 +202,22 @@ public class ThesisService {
         try {
             File f1 = new File(v1.getFilePath());
             File f2 = new File(v2.getFilePath());
-            return diffUtil.compareFilesWithFullContent(f1.getAbsolutePath(), f2.getAbsolutePath());
+            DiffUtil.FullDiffResult result = diffUtil.compareFilesWithFullContent(f1.getAbsolutePath(), f2.getAbsolutePath());
+            result.setOriginalFileName(extractDisplayFileName(v1.getFilePath()));
+            result.setRevisedFileName(extractDisplayFileName(v2.getFilePath()));
+            return result;
         } catch (IOException e) {
             throw new RuntimeException("文件对比失败", e);
         }
+    }
+
+    private String extractDisplayFileName(String filePath) {
+        if (filePath == null || filePath.isEmpty()) {
+            return "";
+        }
+        // 提取文件名并移除 UUID 前缀 (标准 8-4-4-4-12 格式)
+        String fileName = new File(filePath).getName();
+        return fileName.replaceFirst("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}_", "");
     }
 
     private String calculateHash(byte[] data) {

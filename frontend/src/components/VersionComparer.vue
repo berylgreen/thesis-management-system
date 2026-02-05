@@ -57,18 +57,24 @@
             </div>
           </div>
           <el-row :gutter="20">
-            <el-col :span="12">
-              <h4 class="version-title">旧版本</h4>
-              <div class="content-blocks-container" ref="originalBlocksContainer" @scroll="onOriginalScroll">
+            <!-- 日期新的放在左边 (Revised/新版本) -->
+            <el-col :span="isMobile || !highlightDiff ? 24 : 12">
+              <h4 class="version-title" :title="formattedRevisedFileName">新版本: {{ formattedRevisedFileName || '新版本' }}</h4>
+              <div 
+                class="content-blocks-container" 
+                :class="{ 'normal-view-container': !highlightDiff && !isMobile }"
+                ref="revisedBlocksContainer" 
+                @scroll="onRevisedScroll"
+              >
                 <div
-                  v-for="(block, index) in originalBlocks"
-                  :key="'orig-' + index"
-                  :class="['content-block', 'block-' + block.type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(index, 'original') }]"
-                  :id="'orig-block-' + index"
-                  :ref="el => setBlockRef(el, index, 'original')"
+                  v-for="(block, index) in revisedBlocks"
+                  :key="'rev-' + index"
+                  :class="['content-block', 'block-' + block.type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(index, 'revised') }]"
+                  :id="'rev-block-' + index"
+                  :ref="el => setBlockRef(el, index, 'revised')"
                 >
                   <!-- 文本内容（细粒度高亮） -->
-                  <p v-if="block.type === 'TEXT'" class="text-block" v-html="getHighlightedText(index, 'original')"></p>
+                  <p v-if="block.type === 'TEXT'" class="text-block" v-html="getHighlightedText(index, 'revised')"></p>
                   
                   <!-- 表格内容 -->
                   <div v-else-if="block.type === 'TABLE'" class="table-block" v-html="block.content"></div>
@@ -80,18 +86,20 @@
                 </div>
               </div>
             </el-col>
-            <el-col :span="12">
-              <h4 class="version-title">新版本</h4>
-              <div class="content-blocks-container" ref="revisedBlocksContainer" @scroll="onRevisedScroll">
+
+            <!-- 旧版本放在右边 (Original/旧版本) -->
+            <el-col v-if="highlightDiff && !isMobile" :span="12">
+              <h4 class="version-title" :title="formattedOriginalFileName">旧版本: {{ formattedOriginalFileName || '旧版本' }}</h4>
+              <div class="content-blocks-container" ref="originalBlocksContainer" @scroll="onOriginalScroll">
                 <div
-                  v-for="(block, index) in revisedBlocks"
-                  :key="'rev-' + index"
-                  :class="['content-block', 'block-' + block.type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(index, 'revised') }]"
-                  :id="'rev-block-' + index"
-                  :ref="el => setBlockRef(el, index, 'revised')"
+                  v-for="(block, index) in originalBlocks"
+                  :key="'orig-' + index"
+                  :class="['content-block', 'block-' + block.type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(index, 'original') }]"
+                  :id="'orig-block-' + index"
+                  :ref="el => setBlockRef(el, index, 'original')"
                 >
                   <!-- 文本内容（细粒度高亮） -->
-                  <p v-if="block.type === 'TEXT'" class="text-block" v-html="getHighlightedText(index, 'revised')"></p>
+                  <p v-if="block.type === 'TEXT'" class="text-block" v-html="getHighlightedText(index, 'original')"></p>
                   
                   <!-- 表格内容 -->
                   <div v-else-if="block.type === 'TABLE'" class="table-block" v-html="block.content"></div>
@@ -185,8 +193,20 @@ const props = defineProps({
   version2Id: {
     type: [String, Number],
     required: true
+  },
+  originalFileName: {
+    type: String,
+    default: ''
+  },
+  revisedFileName: {
+    type: String,
+    default: ''
   }
 })
+
+// 格式化文件名：移除 UUID 前缀
+const formattedOriginalFileName = computed(() => formatFileName(props.originalFileName))
+const formattedRevisedFileName = computed(() => formatFileName(props.revisedFileName))
 
 const isLoading = ref(true)
 const error = ref(null)
@@ -598,6 +618,21 @@ function escapeHtml(text) {
 }
 
 
+// 文件名格式化函数：剥离路径和可选的UUID前缀
+function formatFileName(fileName) {
+  if (!fileName) return '';
+  // 1. 剥离路径，获取基本文件名
+  const basename = fileName.split(/[/\\]/).pop() || '';
+  
+  // 2. 匹配并移除常见的UUID前缀
+  const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?|^[0-9a-fA-F]{32}[_-]?/;
+  const match = basename.match(uuidPattern);
+  if (match) {
+    return basename.substring(match[0].length);
+  }
+  return basename;
+}
+
 // 数据获取
 async function fetchData() {
   try {
@@ -692,7 +727,9 @@ function convertBackendToDiff2Html(data) {
   diffBlocks.value = reconstructed.diffBlocks
 
   // 生成标准 unified diff 格式字符串，包含完整文档上下文
-  let diffString = '--- 旧版本\n+++ 新版本\n'
+  const oldName = (formattedOriginalFileName.value || '旧版本').replace(/[\r\n\t]/g, ' ')
+  const newName = (formattedRevisedFileName.value || '新版本').replace(/[\r\n\t]/g, ' ')
+  let diffString = `--- 旧版本: ${oldName}\n+++ 新版本: ${newName}\n`
 
   // 创建差异位置索引（用于快速查找某行是否有差异）
   const originalDiffMap = new Map() // originalPosition -> chunk
@@ -835,7 +872,7 @@ function scrollToDiff(index) {
 
 onMounted(() => {
   fetchData()
-  activeTab.value = isMobile.value ? 'unified' : 'summary'
+  activeTab.value = isMobile.value ? 'unified' : 'full-content'
   window.addEventListener('resize', handleResize)
 })
 
@@ -877,12 +914,15 @@ onUnmounted(() => {
 
 .version-title {
   margin-bottom: 15px;
-  padding: 10px;
+  padding: 10px 15px;
   background: #f5f7fa;
   border-radius: 4px;
-  text-align: center;
+  text-align: left;
   font-weight: bold;
   color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .content-blocks-container {
@@ -892,6 +932,12 @@ onUnmounted(() => {
   border-radius: 4px;
   padding: 15px;
   background: #fff;
+}
+
+.normal-view-container {
+  max-width: 900px;
+  margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .content-block {
@@ -949,6 +995,17 @@ onUnmounted(() => {
 /* 隐藏 diff2html 的文件头 */
 :deep(.d2h-file-header) {
   display: none;
+}
+
+/* 交换左右栏：让新版本(Revised)在左，旧版本(Original)在右 */
+:deep(.d2h-file-side-diff) {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+:deep(.d2h-code-side-wrapper) {
+  flex: 1;
+  width: 50%;
 }
 
 /* 当前差异高亮效果 */

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '../store/user'
+import MainLayout from '../layouts/MainLayout.vue'
 
 const routes = [
   {
@@ -9,21 +10,29 @@ const routes = [
   },
   {
     path: '/',
-    name: 'Home',
-    component: () => import('../views/Home.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/thesis',
-    name: 'Thesis',
-    component: () => import('../views/ThesisList.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/thesis/:id',
-    name: 'ThesisDetail',
-    component: () => import('../views/ThesisDetail.vue'),
-    meta: { requiresAuth: true }
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'Home',
+        component: () => import('../views/Home.vue'),
+        meta: { breadcrumb: ['控制台'] }
+      },
+      {
+        path: 'theses',
+        alias: 'thesis',
+        name: 'Thesis',
+        component: () => import('../views/ThesisList.vue'),
+        meta: { breadcrumb: ['论文管理', '论文列表'] }
+      },
+      {
+        path: 'thesis/:id',
+        name: 'ThesisDetail',
+        component: () => import('../views/ThesisDetail.vue'),
+        meta: { breadcrumb: ['论文管理', '论文详情'] }
+      }
+    ]
   }
 ]
 
@@ -34,10 +43,11 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
+  const isAuthenticated = !!userStore.token
 
-  if (to.meta.requiresAuth && !userStore.token) {
+  if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login')
-  } else if (to.path === '/login' && userStore.token) {
+  } else if (to.path === '/login' && isAuthenticated) {
     next('/')
   } else {
     next()

@@ -1,14 +1,10 @@
 <template>
   <div class="thesis-detail">
-    <el-container>
-      <el-header>
-        <h1>论文详情</h1>
-        <el-button @click="router.back()">返回</el-button>
-      </el-header>
-      <el-main>
-        <el-card>
-          <h2>版本列表</h2>
-          <div style="margin: 10px 0">
+    <el-card class="detail-card">
+      <template #header>
+        <div class="card-header">
+          <span class="title">版本管理</span>
+          <div class="header-buttons">
             <el-button type="primary" @click="showUploadDialog = true">
               上传新版本
             </el-button>
@@ -20,33 +16,44 @@
               对比所选版本 ({{ selectedVersions.length }}/2)
             </el-button>
           </div>
-          <el-table
-            :data="versions"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="versionNum" label="版本号" width="100" />
-            <el-table-column prop="filePath" label="文件路径" />
-            <el-table-column prop="fileSize" label="大小" width="120">
-              <template #default="{ row }">
-                {{ formatSize(row.fileSize) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="remark" label="说明" />
-            <el-table-column prop="createdAt" label="上传时间" width="180" />
-            <el-table-column label="操作" width="200">
-              <template #default="{ row }">
-                <el-button type="primary" size="small" @click="handleDownload(row.id)">
-                  下载
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-main>
-    </el-container>
+        </div>
+      </template>
 
+      <el-table
+        :data="versions"
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+        v-loading="loading"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="versionNum" label="版本号" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag size="small">V{{ row.versionNum }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="文件名" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ formatFileName(row.filePath) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="fileSize" label="大小" width="120">
+          <template #default="{ row }">
+            {{ formatSize(row.fileSize) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="说明" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="createdAt" label="上传时间" width="180" />
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="handleDownload(row.id)">
+              下载
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 上传 Dialog -->
     <el-dialog v-model="showUploadDialog" title="上传新版本" width="500px">
       <el-form :model="uploadForm">
         <el-form-item label="选择文件">
@@ -78,15 +85,17 @@
     >
       <VersionComparer
         v-if="showCompareDialog && selectedVersions.length === 2"
-        :version1-id="selectedVersions[0].id"
-        :version2-id="selectedVersions[1].id"
+        :version1-id="sortedSelectedVersions[1].id"
+        :version2-id="sortedSelectedVersions[0].id"
+        :original-file-name="sortedSelectedVersions[1].filePath"
+        :revised-file-name="sortedSelectedVersions[0].filePath"
       />
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, defineAsyncComponent } from 'vue'
+import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getVersions, uploadVersion, downloadVersion } from '../api/thesis'
 import { ElMessage } from 'element-plus'
@@ -106,6 +115,35 @@ const showCompareDialog = ref(false)
 const selectedVersions = ref([])
 const uploadForm = ref({ remark: '' })
 const uploadFile = ref(null)
+const loading = ref(false)
+
+// 对选择的版本进行排序：[新版本, 旧版本]
+const sortedSelectedVersions = computed(() => {
+  if (selectedVersions.value.length !== 2) return []
+  return [...selectedVersions.value].sort((a, b) => {
+    // 先按创建时间比
+    if (a.createdAt !== b.createdAt) {
+      return new Date(b.createdAt) - new Date(a.createdAt)
+    }
+    // 同一时间按版本号比
+    return b.versionNum - a.versionNum
+  })
+})
+
+// 格式化文件名：移除路径和 UUID 前缀
+const formatFileName = (filePath) => {
+  if (!filePath) return ''
+  // 1. 剥离路径，获取基本文件名 (兼容 / 和 \)
+  const basename = filePath.split(/[/\\]/).pop() || ''
+
+  // 2. 匹配并移除常见的 UUID 前缀 (36位标准格式 或 32位紧凑格式)
+  const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[_-]?|^[0-9a-fA-F]{32}[_-]?/
+  const match = basename.match(uuidPattern)
+  if (match) {
+    return basename.substring(match[0].length)
+  }
+  return basename
+}
 
 // 处理版本选择变化
 const handleSelectionChange = (selection) => {
@@ -113,11 +151,14 @@ const handleSelectionChange = (selection) => {
 }
 
 const loadVersions = async () => {
+  loading.value = true
   try {
     const res = await getVersions(thesisId)
     versions.value = res.data
   } catch (error) {
     console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -177,15 +218,28 @@ onMounted(() => {
 
 <style scoped>
 .thesis-detail {
-  min-height: 100vh;
-  background: #f5f5f5;
+  padding: 0;
 }
 
-.el-header {
+.detail-card {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #409eff;
-  color: white;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 12px;
 }
 </style>

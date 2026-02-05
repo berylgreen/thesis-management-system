@@ -73,4 +73,4 @@ INSERT INTO t_user (username, password_hash, role, real_name, email) VALUES
 -- 插入测试数据（可选）
 INSERT INTO t_user (username, password_hash, role, real_name, email) VALUES
 ('student1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'STUDENT', '张三', 'student1@thesis.com'),
-('teacher1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'TEACHER', '李老师', 'teacher1@thesis.com');
+('tt', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'TEACHER', '李老师', 'teacher1@thesis.com');

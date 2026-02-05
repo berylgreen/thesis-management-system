@@ -269,6 +269,8 @@ public class DiffUtil {
         private List<String> revisedLines;
         private List<ContentBlock> originalBlocks;  // 新增：原始文档内容块
         private List<ContentBlock> revisedBlocks;   // 新增：修订文档内容块
+        private String originalFileName;
+        private String revisedFileName;
 
         public List<DiffResult> getDiffs() { return diffs; }
         public void setDiffs(List<DiffResult> diffs) { this.diffs = diffs; }
@@ -280,5 +282,9 @@ public class DiffUtil {
         public void setOriginalBlocks(List<ContentBlock> originalBlocks) { this.originalBlocks = originalBlocks; }
         public List<ContentBlock> getRevisedBlocks() { return revisedBlocks; }
         public void setRevisedBlocks(List<ContentBlock> revisedBlocks) { this.revisedBlocks = revisedBlocks; }
+        public String getOriginalFileName() { return originalFileName; }
+        public void setOriginalFileName(String originalFileName) { this.originalFileName = originalFileName; }
+        public String getRevisedFileName() { return revisedFileName; }
+        public void setRevisedFileName(String revisedFileName) { this.revisedFileName = revisedFileName; }
     }
 }

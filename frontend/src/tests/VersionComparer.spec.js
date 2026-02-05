@@ -30,7 +30,9 @@ describe('VersionComparer.vue', () => {
   let wrapper
   const mockProps = {
     version1Id: 1,
-    version2Id: 2
+    version2Id: 2,
+    originalFileName: 'old_thesis.docx',
+    revisedFileName: 'new_thesis.docx'
   }
 
   const mockDiffData = {
@@ -208,5 +210,15 @@ describe('VersionComparer.vue', () => {
     wrapper = mount(VersionComparer, { props: { version1Id: 123, version2Id: 456 }, global: { plugins: [ElementPlus] } })
     await flushPromises()
     expect(thesisApi.getDiff).toHaveBeenCalledWith(123, 456)
+  })
+
+  // ==================== 默认 Tab 测试 ====================
+
+  it('应该在桌面端默认显示“完整内容” Tab', async () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 })
+    vi.spyOn(thesisApi, 'getDiff').mockResolvedValue({ data: mockDiffData })
+    wrapper = mount(VersionComparer, { props: mockProps, global: { plugins: [ElementPlus] } })
+    await flushPromises()
+    expect(wrapper.vm.activeTab).toBe('full-content')
   })
 })
