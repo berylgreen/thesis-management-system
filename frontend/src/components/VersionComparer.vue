@@ -346,6 +346,7 @@ function calculateSimilarity(text1, text2) {
   
   // 简化版：使用公共子串长度比例估算相似度
   const diffs = dmp.diff_main(text1, text2)
+  dmp.diff_cleanupSemantic(diffs)
   let commonLength = 0
   for (const [op, data] of diffs) {
     if (op === 0) commonLength += data.length
@@ -395,9 +396,10 @@ function buildParagraphMatching() {
   // 按相似度降序排序
   matches.sort((a, b) => b.similarity - a.similarity)
   
-  // 贪心选择最佳匹配（相似度阈值 > 0.3）
+  // 贪心选择最佳匹配（相似度阈值 > 0.6）
+  const threshold = 0.6
   for (const { i, j, similarity } of matches) {
-    if (similarity < 0.3) break // 相似度太低，不匹配
+    if (similarity < threshold) break // 相似度太低，不匹配
     if (usedOrig.has(i) || usedRev.has(j)) continue
     
     originalToRevised.set(origIndices[i], revIndices[j])
@@ -1113,16 +1115,14 @@ onUnmounted(() => {
 
 /* 细粒度文本差异高亮样式 */
 .diff-deleted {
-  background-color: #ffcdd2;
-  color: #b71c1c;
+  background-color: #ffeef0;
   text-decoration: line-through;
   padding: 1px 2px;
   border-radius: 2px;
 }
 
 .diff-added {
-  background-color: #c8e6c9;
-  color: #1b5e20;
+  background-color: #e6ffed;
   padding: 1px 2px;
   border-radius: 2px;
   font-weight: 500;
