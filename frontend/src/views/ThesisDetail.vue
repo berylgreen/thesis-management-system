@@ -3,7 +3,7 @@
     <el-card class="detail-card">
       <template #header>
         <div class="card-header">
-          <span class="title">版本管理</span>
+          <span class="title">{{ thesis?.title || '版本管理' }}</span>
           <div class="header-buttons">
             <el-button type="primary" @click="showUploadDialog = true">
               上传新版本
@@ -98,8 +98,9 @@
 <script setup>
 import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getVersions, uploadVersion, downloadVersion } from '../api/thesis'
+import { getVersions, uploadVersion, downloadVersion, getThesis } from '../api/thesis'
 import { ElMessage } from 'element-plus'
+import { useLayoutStore } from '@/store/layout'
 
 // 懒加载 VersionComparer 组件
 const VersionComparer = defineAsyncComponent(() =>
@@ -108,8 +109,10 @@ const VersionComparer = defineAsyncComponent(() =>
 
 const route = useRoute()
 const router = useRouter()
+const layoutStore = useLayoutStore()
 
 const thesisId = route.params.id
+const thesis = ref(null)
 const versions = ref([])
 const showUploadDialog = ref(false)
 const showCompareDialog = ref(false)
@@ -164,6 +167,21 @@ const loadVersions = async () => {
   }
 }
 
+const loadThesis = async () => {
+  try {
+    const res = await getThesis(thesisId)
+    thesis.value = res.data
+    if (thesis.value) {
+      layoutStore.addRecentThesis({
+        id: thesis.value.id,
+        title: thesis.value.title
+      })
+    }
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const handleFileChange = (file) => {
   uploadFile.value = file.raw
 }
@@ -214,6 +232,7 @@ const formatSize = (bytes) => {
 }
 
 onMounted(() => {
+  loadThesis()
   loadVersions()
 })
 </script>
