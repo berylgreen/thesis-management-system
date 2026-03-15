@@ -11,8 +11,11 @@ import org.springframework.stereotype.Component;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -81,15 +84,7 @@ public class DiffUtil {
     private List<String> extractTextLines(List<ContentBlock> blocks) {
         List<String> lines = new ArrayList<>();
         for (ContentBlock block : blocks) {
-            if ("TEXT".equals(block.getType())) {
-                lines.add(block.getContent());
-            } else if ("TABLE".equals(block.getType())) {
-                // 表格用占位符表示，用于对比时识别表格位置变化
-                lines.add("[表格]");
-            } else if ("IMAGE".equals(block.getType())) {
-                // 图片用占位符表示
-                lines.add("[图片]");
-            }
+            lines.add(block.getSignature());
         }
         return lines;
     }
@@ -134,7 +129,9 @@ public class DiffUtil {
             int index = 0;
             for (String line : lines) {
                 if (!line.trim().isEmpty()) {
-                    blocks.add(new ContentBlock("TEXT", line, index++));
+                    ContentBlock block = new ContentBlock("TEXT", line, index++);
+                    block.setSignature(line);
+                    blocks.add(block);
                 }
             }
             return blocks;
@@ -149,36 +146,64 @@ public class DiffUtil {
             for (IBodyElement element : document.getBodyElements()) {
                 if (element instanceof XWPFParagraph) {
                     XWPFParagraph paragraph = (XWPFParagraph) element;
-                    
+
                     // 检查段落中是否包含图片
                     for (XWPFRun run : paragraph.getRuns()) {
                         List<XWPFPicture> pictures = run.getEmbeddedPictures();
                         for (XWPFPicture picture : pictures) {
                             XWPFPictureData pictureData = picture.getPictureData();
                             if (pictureData != null) {
-                                String base64 = Base64.getEncoder().encodeToString(pictureData.getData());
+                                byte[] data = pictureData.getData();
+                                String base64 = Base64.getEncoder().encodeToString(data);
                                 String mimeType = pictureData.getPackagePart().getContentType();
                                 String dataUrl = "data:" + mimeType + ";base64," + base64;
-                                blocks.add(new ContentBlock("IMAGE", dataUrl, blockIndex++));
+                                ContentBlock block = new ContentBlock("IMAGE", dataUrl, blockIndex++);
+                                block.setSignature("[IMAGE_" + hash(base64) + "]");
+                                blocks.add(block);
                             }
                         }
                     }
-                    
+
                     // 添加段落文本
                     String text = paragraph.getText();
                     if (text != null && !text.trim().isEmpty()) {
-                        blocks.add(new ContentBlock("TEXT", text, blockIndex++));
+                        ContentBlock block = new ContentBlock("TEXT", text, blockIndex++);
+                        block.setSignature(text);
+                        blocks.add(block);
                     }
-                    
+
                 } else if (element instanceof XWPFTable) {
                     XWPFTable table = (XWPFTable) element;
+                    int rowCount = table.getNumberOfRows();
+                    int colCount = rowCount > 0 ? table.getRow(0).getTableCells().size() : 0;
                     String tableHtml = convertTableToHtml(table);
-                    blocks.add(new ContentBlock("TABLE", tableHtml, blockIndex++));
+                    ContentBlock block = new ContentBlock("TABLE", tableHtml, blockIndex++);
+                    block.setSignature("[TABLE_" + rowCount + "x" + colCount + "_" + hash(tableHtml) + "]");
+                    blocks.add(block);
                 }
             }
         }
-        
+
         return blocks;
+    }
+
+    /**
+     * 简单的哈希函数，用于生成唯一的签名
+     */
+    private String hash(String content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("MD5 algorithm not found", e);
+        }
     }
 
     /**
@@ -217,12 +242,10 @@ public class DiffUtil {
 
     // ==================== 数据类 ====================
 
-    /**
-     * 内容块：表示文档中的一个元素（文本/表格/图片）
-     */
     public static class ContentBlock {
         private String type;      // TEXT, TABLE, IMAGE
         private String content;   // 文本内容、表格HTML、或图片Base64 Data URL
+        private String signature; // 用于差异对比的唯一签名
         private int index;        // 在文档中的顺序
 
         public ContentBlock() {}
@@ -237,6 +260,8 @@ public class DiffUtil {
         public void setType(String type) { this.type = type; }
         public String getContent() { return content; }
         public void setContent(String content) { this.content = content; }
+        public String getSignature() { return signature; }
+        public void setSignature(String signature) { this.signature = signature; }
         public int getIndex() { return index; }
         public void setIndex(int index) { this.index = index; }
     }

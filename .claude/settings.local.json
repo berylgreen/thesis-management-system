@@ -61,7 +61,13 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git remote add:*)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Skill(superpowers:writing-plans)",
+      "Bash(date:*)",
+      "Bash(time:*)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(npm run build:*)",
+      "Bash(echo:*)"
     ]
   }
 }

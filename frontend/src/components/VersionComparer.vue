@@ -57,60 +57,72 @@
             </div>
           </div>
           <el-row :gutter="20">
-            <!-- 日期新的放在左边 (Revised/新版本，单版本模式显示"文档内容") -->
-            <el-col :span="isSingleView || isMobile || !highlightDiff ? 24 : 12">
-              <h4 class="version-title" :title="formattedRevisedFileName">{{ isSingleView ? '文档内容' : '新版本' }}: {{ formattedRevisedFileName || (isSingleView ? '' : '新版本') }}</h4>
-              <div 
-                class="content-blocks-container" 
-                :class="{ 'normal-view-container': !highlightDiff && !isMobile }"
-                ref="revisedBlocksContainer" 
-                @scroll="onRevisedScroll"
-              >
-                <div
-                  v-for="(block, index) in revisedBlocks"
-                  :key="'rev-' + index"
-                  :class="['content-block', 'block-' + block.type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(index, 'revised') }]"
-                  :id="'rev-block-' + index"
-                  :ref="el => setBlockRef(el, index, 'revised')"
-                >
-                  <!-- 文本内容（细粒度高亮） -->
-                  <p v-if="block.type === 'TEXT'" class="text-block" v-html="getHighlightedText(index, 'revised')"></p>
-                  
-                  <!-- 表格内容 -->
-                  <div v-else-if="block.type === 'TABLE'" class="table-block" v-html="block.content"></div>
-                  
-                  <!-- 图片内容 -->
-                  <div v-else-if="block.type === 'IMAGE'" class="image-block">
-                    <img :src="block.content" alt="文档图片" />
+            <!-- 对齐后的视图 -->
+            <template v-if="!isSingleView && highlightDiff && !isMobile">
+              <div class="aligned-blocks-wrapper" ref="alignedBlocksWrapper">
+                <div v-for="(pair, pIdx) in alignedBlocks"
+                     :key="'pair-' + pIdx"
+                     class="aligned-row"
+                     :class="{ 'current-diff-row': isCurrentDiffRow(pIdx) }"
+                     :ref="el => setRowRef(el, pIdx)">
+                  <!-- 新版本 (左) -->
+                  <div class="aligned-col">
+                    <div
+                      v-if="pair.revIndex >= 0"
+                      :class="['content-block', 'block-' + revisedBlocks[pair.revIndex].type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(pair.revIndex, 'revised') }]"
+                      :ref="el => setBlockRef(el, pair.revIndex, 'revised')"
+                    >
+                      <p v-if="revisedBlocks[pair.revIndex].type === 'TEXT'" class="text-block" v-html="getHighlightedText(pair.revIndex, 'revised')"></p>
+                      <div v-else-if="revisedBlocks[pair.revIndex].type === 'TABLE'" class="table-block" v-html="revisedBlocks[pair.revIndex].content"></div>
+                      <div v-else-if="revisedBlocks[pair.revIndex].type === 'IMAGE'" class="image-block">
+                        <img :src="revisedBlocks[pair.revIndex].content" alt="文档图片" />
+                      </div>
+                    </div>
+                    <div v-else class="empty-block"></div>
                   </div>
-                </div>
-              </div>
-            </el-col>
 
-            <!-- 旧版本放在右边 (Original/旧版本) - 单版本模式不显示 -->
-            <el-col v-if="!isSingleView && highlightDiff && !isMobile" :span="12">
-              <h4 class="version-title" :title="formattedOriginalFileName">旧版本: {{ formattedOriginalFileName || '旧版本' }}</h4>
-              <div class="content-blocks-container" ref="originalBlocksContainer" @scroll="onOriginalScroll">
-                <div
-                  v-for="(block, index) in originalBlocks"
-                  :key="'orig-' + index"
-                  :class="['content-block', 'block-' + block.type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(index, 'original') }]"
-                  :id="'orig-block-' + index"
-                  :ref="el => setBlockRef(el, index, 'original')"
-                >
-                  <!-- 文本内容（细粒度高亮） -->
-                  <p v-if="block.type === 'TEXT'" class="text-block" v-html="getHighlightedText(index, 'original')"></p>
-                  
-                  <!-- 表格内容 -->
-                  <div v-else-if="block.type === 'TABLE'" class="table-block" v-html="block.content"></div>
-                  
-                  <!-- 图片内容 -->
-                  <div v-else-if="block.type === 'IMAGE'" class="image-block">
-                    <img :src="block.content" alt="文档图片" />
+                  <!-- 旧版本 (右) -->
+                  <div class="aligned-col">
+                    <div
+                      v-if="pair.origIndex >= 0"
+                      :class="['content-block', 'block-' + originalBlocks[pair.origIndex].type.toLowerCase(), { 'current-diff-block': isCurrentDiffBlock(pair.origIndex, 'original') }]"
+                      :ref="el => setBlockRef(el, pair.origIndex, 'original')"
+                    >
+                      <p v-if="originalBlocks[pair.origIndex].type === 'TEXT'" class="text-block" v-html="getHighlightedText(pair.origIndex, 'original')"></p>
+                      <div v-else-if="originalBlocks[pair.origIndex].type === 'TABLE'" class="table-block" v-html="originalBlocks[pair.origIndex].content"></div>
+                      <div v-else-if="originalBlocks[pair.origIndex].type === 'IMAGE'" class="image-block">
+                        <img :src="originalBlocks[pair.origIndex].content" alt="文档图片" />
+                      </div>
+                    </div>
+                    <div v-else class="empty-block"></div>
                   </div>
                 </div>
               </div>
-            </el-col>
+            </template>
+
+            <!-- 单视图或移动端或关闭高亮时 -->
+            <template v-else>
+              <el-col :span="24">
+                <h4 class="version-title" :title="formattedRevisedFileName">{{ isSingleView ? '文档内容' : '新版本' }}: {{ formattedRevisedFileName || (isSingleView ? '' : '新版本') }}</h4>
+                <div
+                  class="content-blocks-container"
+                  :class="{ 'normal-view-container': !highlightDiff && !isMobile }"
+                  ref="revisedBlocksContainer"
+                >
+                  <div
+                    v-for="(block, index) in revisedBlocks"
+                    :key="'rev-' + index"
+                    :class="['content-block', 'block-' + block.type.toLowerCase()]"
+                  >
+                    <p v-if="block.type === 'TEXT'" class="text-block" v-html="getHighlightedText(index, 'revised')"></p>
+                    <div v-else-if="block.type === 'TABLE'" class="table-block" v-html="block.content"></div>
+                    <div v-else-if="block.type === 'IMAGE'" class="image-block">
+                      <img :src="block.content" alt="文档图片" />
+                    </div>
+                  </div>
+                </div>
+              </el-col>
+            </template>
           </el-row>
         </div>
       </el-tab-pane>
@@ -249,9 +261,10 @@ const unifiedContainer = ref(null)
 // 完整内容导航相关状态
 const originalBlocksContainer = ref(null)
 const revisedBlocksContainer = ref(null)
-const fullContentDiffList = ref([]) // 有差异的块列表 [{ origIndex, revIndex }]
 const currentFullContentDiffIndex = ref(0)
 const blockRefs = ref({ original: {}, revised: {} })
+const rowRefs = ref({})
+const alignedBlocksWrapper = ref(null)
 
 // 统计摘要计算
 const summary = computed(() => {
@@ -278,6 +291,73 @@ const summary = computed(() => {
   })
 
   return { added, deleted, modified, richContent }
+})
+
+// 计算对齐后的块索引映射
+const alignedBlocks = computed(() => {
+  const diffList = fullContentDiffList.value
+  const origBlocks = originalBlocks.value
+  const revBlocks = revisedBlocks.value
+
+  const aligned = []
+
+  // 使用双指针或直接遍历 diffList 来构建对齐视图
+  // 这里的目标是生成一个包含 { origBlock, revBlock, type } 的数组，用于 v-for
+
+  // 简单实现：按顺序遍历所有块，并根据 diffList 进行对齐
+  let origIdx = 0
+  let revIdx = 0
+
+  // 我们需要一个更健壮的对齐逻辑
+  // 实际上 fullContentDiffList 已经包含了 CHANGE, DELETE, INSERT
+  // 但它只包含了有差异的部分。我们需要包含没有差异的部分。
+
+  const matchMap = paragraphMatchCache.value.originalToRevised
+
+  const result = []
+  const usedRevIndices = new Set()
+
+  for (let i = 0; i < origBlocks.length; i++) {
+    const matchedRevIdx = matchMap.get(i)
+    if (matchedRevIdx !== undefined) {
+      // 匹配到了（可能是 CHANGE 或 EQUAL）
+      result.push({
+        origIndex: i,
+        revIndex: matchedRevIdx,
+        type: origBlocks[i].content === revBlocks[matchedRevIdx].content ? 'EQUAL' : 'CHANGE'
+      })
+      usedRevIndices.add(matchedRevIdx)
+    } else {
+      // 删除了
+      result.push({
+        origIndex: i,
+        revIndex: -1,
+        type: 'DELETE'
+      })
+    }
+  }
+
+  // 添加新增的块
+  for (let j = 0; j < revBlocks.length; j++) {
+    if (!usedRevIndices.has(j)) {
+      // 查找插入位置：尽可能插入到原本应该在的位置
+      // 这里简化处理：追加到末尾，或者我们可以更聪明点
+      result.push({
+        origIndex: -1,
+        revIndex: j,
+        type: 'INSERT'
+      })
+    }
+  }
+
+  // 排序以保持文档顺序
+  result.sort((a, b) => {
+    const posA = a.origIndex >= 0 ? a.origIndex : (a.revIndex + 0.5)
+    const posB = b.origIndex >= 0 ? b.origIndex : (b.revIndex + 0.5)
+    return posA - posB
+  })
+
+  return result
 })
 
 // 响应式监听
@@ -409,70 +489,29 @@ function buildParagraphMatching() {
   }
   
   paragraphMatchCache.value = { originalToRevised, revisedToOriginal }
-  
-  // 构建差异列表（用于导航）
-  buildFullContentDiffList(originalToRevised, origIndices, usedOrig, revIndices, usedRev)
 }
 
-// 构建完整内容差异列表
-function buildFullContentDiffList(originalToRevised, origIndices, usedOrig, revIndices, usedRev) {
-  const diffList = []
-  
-  // 遍历原始文档的文本块
-  origIndices.forEach((origIndex, i) => {
-    const revIndex = originalToRevised.get(origIndex)
-    if (revIndex !== undefined) {
-      // 匹配到的块，检查是否有差异
-      const origText = originalBlocks.value[origIndex]?.content || ''
-      const revText = revisedBlocks.value[revIndex]?.content || ''
-      if (origText !== revText) {
-        diffList.push({ origIndex, revIndex, type: 'CHANGE' })
-      }
-    } else {
-      // 未匹配到的块（删除的内容）
-      diffList.push({ origIndex, revIndex: -1, type: 'DELETE' })
-    }
-  })
-  
-  // 遍历修订文档中未匹配的块（新增的内容）
-  revIndices.forEach((revIndex, j) => {
-    if (!usedRev.has(j)) {
-      diffList.push({ origIndex: -1, revIndex, type: 'INSERT' })
-    }
-  })
-  
-  // 按位置排序
-  diffList.sort((a, b) => {
-    const posA = a.origIndex >= 0 ? a.origIndex : a.revIndex
-    const posB = b.origIndex >= 0 ? b.origIndex : b.revIndex
-    return posA - posB
-  })
-  
-  fullContentDiffList.value = diffList
-  currentFullContentDiffIndex.value = 0
-}
+// 完整内容差异列表（基于对齐后的行）
+const fullContentDiffList = computed(() => {
+  return alignedBlocks.value
+    .map((pair, index) => ({ ...pair, rowIndex: index }))
+    .filter(pair => pair.type !== 'EQUAL')
+})
 
-// 计算差异总数
 const fullContentDiffCount = computed(() => fullContentDiffList.value.length)
 
-// 设置块的 ref
-function setBlockRef(el, index, side) {
+// 设置行的 ref
+function setRowRef(el, index) {
   if (el) {
-    blockRefs.value[side][index] = el
+    rowRefs.value[index] = el
   }
 }
 
-// 判断是否为当前高亮的差异块
-function isCurrentDiffBlock(index, side) {
+// 判断是否为当前高亮的差异行
+function isCurrentDiffRow(rowIndex) {
   if (!highlightDiff.value || fullContentDiffList.value.length === 0) return false
   const currentDiff = fullContentDiffList.value[currentFullContentDiffIndex.value]
-  if (!currentDiff) return false
-  
-  if (side === 'original') {
-    return currentDiff.origIndex === index
-  } else {
-    return currentDiff.revIndex === index
-  }
+  return currentDiff && currentDiff.rowIndex === rowIndex
 }
 
 // 跳转到上一处差异
@@ -495,23 +534,30 @@ function goToNextFullContentDiff() {
 function scrollToCurrentDiff() {
   const currentDiff = fullContentDiffList.value[currentFullContentDiffIndex.value]
   if (!currentDiff) return
-  
-  // 滚动原始文档
-  if (currentDiff.origIndex >= 0) {
-    const origEl = blockRefs.value.original[currentDiff.origIndex]
-    if (origEl) {
-      origEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+
+  const targetRow = rowRefs.value[currentDiff.rowIndex]
+  if (targetRow) {
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
-  
-  // 滚动修订文档
-  if (currentDiff.revIndex >= 0) {
-    const revEl = blockRefs.value.revised[currentDiff.revIndex]
-    if (revEl) {
-      setTimeout(() => {
-        revEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 100)
-    }
+}
+
+// 设置块的 ref
+function setBlockRef(el, index, side) {
+  if (el) {
+    blockRefs.value[side][index] = el
+  }
+}
+
+// 判断是否为当前高亮的差异块
+function isCurrentDiffBlock(index, side) {
+  if (!highlightDiff.value || fullContentDiffList.value.length === 0) return false
+  const currentDiff = fullContentDiffList.value[currentFullContentDiffIndex.value]
+  if (!currentDiff) return false
+
+  if (side === 'original') {
+    return currentDiff.origIndex === index
+  } else {
+    return currentDiff.revIndex === index
   }
 }
 
@@ -702,13 +748,19 @@ function renderDiffs() {
     sideBySideHtml.value = Diff2Html.html(diffJson, {
       drawFileList: false,
       outputFormat: 'side-by-side',
-      matching: 'lines'
+      matching: 'lines',
+      diffMaxChanges: 1000,
+      diffMaxLineLength: 1000,
+      matchingMaxUrgency: 1000
     })
   }
 
   unifiedHtml.value = Diff2Html.html(diffJson, {
     drawFileList: false,
-    outputFormat: 'line-by-line'
+    outputFormat: 'line-by-line',
+    diffMaxChanges: 1000,
+    diffMaxLineLength: 1000,
+    matchingMaxUrgency: 1000
   })
 }
 
@@ -1128,22 +1180,15 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* 当前差异块高亮 */
-.current-diff-block {
-  outline: 3px solid #ffc107 !important;
-  outline-offset: 2px;
-  background-color: rgba(255, 235, 59, 0.15) !important;
-  position: relative;
+/* 当前差异行高亮 */
+.current-diff-row {
+  outline: 2px solid #ffc107;
+  outline-offset: -2px;
+  background-color: rgba(255, 193, 7, 0.05);
 }
 
-.current-diff-block::before {
-  content: '▶';
-  position: absolute;
-  left: -20px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #ffc107;
-  font-size: 14px;
+.current-diff-row .content-block {
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.3);
 }
 
 /* 差异导航栏样式 */
@@ -1161,5 +1206,41 @@ onUnmounted(() => {
   color: #666;
   font-weight: 500;
   min-width: 60px;
+}
+
+/* 对齐视图样式 */
+.aligned-blocks-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #e4e7ed;
+  background: #f9f9f9;
+}
+
+.aligned-row {
+  display: flex;
+  width: 100%;
+  gap: 15px;
+}
+
+.aligned-col {
+  flex: 1;
+  width: 50%;
+  min-height: 20px;
+}
+
+.empty-block {
+  height: 100%;
+  background-color: #f5f5f5;
+  border: 1px dashed #ddd;
+  border-radius: 4px;
+}
+
+.content-block {
+  margin-bottom: 0 !important; /* 对齐模式下不需要底部间距 */
 }
 </style>
