@@ -20,8 +20,8 @@ function Show-Status {
     # Check Backend Port 8080
     if (Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue) { Write-Host "Backend (8080):  RUNNING" -ForegroundColor Green } else { Write-Host "Backend (8080):  STOPPED" -ForegroundColor Red }
 
-    # Check Frontend Port 3000
-    if (Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue) { Write-Host "Frontend (3000): RUNNING" -ForegroundColor Green } else { Write-Host "Frontend (3000): STOPPED" -ForegroundColor Red }
+    # Check Frontend Port 5173
+    if (Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue) { Write-Host "Frontend (5173): RUNNING" -ForegroundColor Green } else { Write-Host "Frontend (5173): STOPPED" -ForegroundColor Red }
     Write-Host "----------------------`n"
 }
 
@@ -37,7 +37,7 @@ function Start-Services {
     $backendLog = "$logDir\backend.log"
     $backendErr = "$logDir\backend.err.log"
     
-    $pBack = Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d ""$backendPath"" && mvn spring-boot:run > ""$backendLog"" 2> ""$backendErr""" -WindowStyle Hidden -PassThru
+    $pBack = Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d ""$backendPath"" && C:\tools\apache-maven-3.9.9\bin\mvn spring-boot:run > ""$backendLog"" 2> ""$backendErr""" -WindowStyle Hidden -PassThru
     $pBack.Id | Out-File "$logDir\backend.pid"
     
     # 3. Start Frontend
@@ -91,7 +91,7 @@ function Stop-Services {
     }
 
     Kill-Port 8080 "Backend"
-    Kill-Port 3000 "Frontend"
+    Kill-Port 5173 "Frontend"
 }
 
 if ($Action -eq "start") {
@@ -104,7 +104,7 @@ elseif ($Action -eq "stop") {
 }
 elseif ($Action -eq "restart") {
     Stop-Services
-    Start-Interval -Seconds 2
+    Start-Sleep -Seconds 2
     Start-Services
     Show-Status
 }

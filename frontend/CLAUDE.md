@@ -26,14 +26,14 @@
 ### 开发启动
 ```bash
 npm install      # 安装依赖
-npm run dev      # 开发模式（默认端口 3000）
+npm run dev      # 开发模式（默认端口 5173）
 npm run build    # 生产构建
 npm run preview  # 预览构建结果
 ```
 
 ### Vite 配置
 - **文件**: `vite.config.js`
-- **开发端口**: 3000
+- **开发端口**: 5173
 - **代理配置**: `/api` -> `http://localhost:8080`
 
 ### Docker 启动

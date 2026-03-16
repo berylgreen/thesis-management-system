@@ -1,4 +1,4 @@
-﻿# 毕业论文管理系统 - 项目整合说明
+# 毕业论文管理系统 - 项目整合说明
 
 最后更新: 2026-02-02
 
@@ -46,9 +46,9 @@ test16/
 ```
 
 开发环境端口:
-- 前端: http://localhost:3000
+- 前端: http://localhost:5173
 - 后端 API: http://localhost:8080
-- MySQL: localhost:13306
+- MySQL: localhost:23306
 - Redis: localhost:6379
 
 ### Docker Compose（全栈）
@@ -60,7 +60,7 @@ docker-compose up -d
 服务端口:
 - 前端 (Nginx): http://localhost:8888
 - 后端 API: http://localhost:8080/api
-- MySQL: localhost:13306
+- MySQL: localhost:23306
 - Redis: localhost:6379
 
 ## 环境变量
@@ -84,7 +84,7 @@ docker-compose up -d
 
 - 认证方式: JWT Bearer Token
 - Header: `Authorization: Bearer <token>`
-- 后端 CORS 默认允许: http://localhost:8888、http://localhost:3000、http://localhost:3001
+- 后端 CORS 默认允许: http://localhost:8888、http://localhost:5173、http://localhost:3001
 
 ## 接口约定
 

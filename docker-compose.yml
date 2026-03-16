@@ -9,7 +9,7 @@ services:
       MYSQL_DATABASE: thesis_system
       TZ: Asia/Shanghai
     ports:
-      - "13306:3306"
+      - "23306:3306"
     volumes:
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql-data:/var/lib/mysql

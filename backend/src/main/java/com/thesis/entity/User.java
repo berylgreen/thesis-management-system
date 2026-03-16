@@ -20,6 +20,8 @@ public class User {
 
     private String email;
 
+    private String thesisTitle;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

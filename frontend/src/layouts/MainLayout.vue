@@ -29,6 +29,11 @@
           <template #title>论文管理</template>
         </el-menu-item>
 
+        <el-menu-item index="/students" v-if="isAdmin">
+          <el-icon><user /></el-icon>
+          <template #title>学生管理</template>
+        </el-menu-item>
+
         <!-- Recent Theses Section -->
         <div v-if="!layoutStore.isSidebarCollapsed && layoutStore.recentTheses.length > 0" class="menu-divider">
           最近查看
@@ -120,7 +125,8 @@ import {
   ArrowDown,
   School,
   Expand,
-  Fold
+  Fold,
+  User
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -129,6 +135,10 @@ const layoutStore = useLayoutStore()
 const userStore = useUserStore()
 
 const searchQuery = ref('')
+
+const isAdmin = computed(() => {
+  return userStore.role === 'ADMIN' || userStore.role === 'TEACHER'
+})
 
 const activeMenu = computed(() => {
   const { path } = route

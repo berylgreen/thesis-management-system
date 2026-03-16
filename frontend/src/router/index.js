@@ -31,6 +31,12 @@ const routes = [
         name: 'ThesisDetail',
         component: () => import('../views/ThesisDetail.vue'),
         meta: { breadcrumb: ['论文管理', '论文详情'] }
+      },
+      {
+        path: 'students',
+        name: 'StudentList',
+        component: () => import('../views/StudentList.vue'),
+        meta: { breadcrumb: ['学生管理', '学生列表'] }
       }
     ]
   }

@@ -108,7 +108,7 @@ docker-compose down
 
 - 前端 (Docker): <http://localhost:8888>
 - 后端 API (Docker): <http://localhost:8080/api>
-- 前端 (本地开发): <http://localhost:3000>
+- 前端 (本地开发): <http://localhost:5173>
 
 ### 本地开发
 

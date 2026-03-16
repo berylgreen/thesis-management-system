@@ -102,7 +102,7 @@ const handleForceSync = async () => {
   try {
     const res = await forceSync()
     const data = res.data
-    ElMessage.success(`同步完成！删除 ${data.deletedVersions || 0} 个版本, ${data.deletedTheses || 0} 篇论文`)
+    ElMessage.success(`同步完成！删除 ${data.deletedVersions || 0} 个版本, ${data.deletedTheses || 0} 篇论文, 合并 ${data.mergedTheses || 0} 篇重复论文`)
     loadTheses()
   } catch (error) {
     ElMessage.error('同步失败: ' + (error.message || '未知错误'))
