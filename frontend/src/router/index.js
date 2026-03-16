@@ -17,26 +17,26 @@ const routes = [
         path: '',
         name: 'Home',
         component: () => import('../views/Home.vue'),
-        meta: { breadcrumb: ['控制台'] }
+        meta: { breadcrumb: [{ label: '控制台' }] }
       },
       {
         path: 'theses',
         alias: 'thesis',
         name: 'Thesis',
         component: () => import('../views/ThesisList.vue'),
-        meta: { breadcrumb: ['论文管理', '论文列表'] }
+        meta: { breadcrumb: [{ label: '论文管理', to: '/theses' }, { label: '论文列表' }] }
       },
       {
         path: 'thesis/:id',
         name: 'ThesisDetail',
         component: () => import('../views/ThesisDetail.vue'),
-        meta: { breadcrumb: ['论文管理', '论文详情'] }
+        meta: { breadcrumb: [{ label: '论文管理', to: '/theses' }, { label: '论文详情' }] }
       },
       {
         path: 'students',
         name: 'StudentList',
         component: () => import('../views/StudentList.vue'),
-        meta: { breadcrumb: ['学生管理', '学生列表'] }
+        meta: { breadcrumb: [{ label: '学生管理', to: '/students' }, { label: '学生列表' }] }
       }
     ]
   }

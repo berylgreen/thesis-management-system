@@ -15,7 +15,7 @@
         </div>
       </template>
 
-      <el-table :data="theses" style="width: 100%" v-loading="loading">
+      <el-table :data="filteredTheses" style="width: 100%" v-loading="loading" @row-click="handleRowClick" row-class-name="clickable-row">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="studentUsername" label="学号" width="150" v-if="isTeacher" />
         <el-table-column prop="studentName" label="学生姓名" width="120" v-if="isTeacher" />
@@ -38,7 +38,7 @@
     <el-dialog v-model="showCreateDialog" title="新建论文" width="500px" destroy-on-close>
       <el-form :model="createForm">
         <el-form-item label="论文标题">
-          <el-input v-model="createForm.title" placeholder="请输入论文标题" />
+          <el-input v-model="createForm.title" placeholder="请输入论文标题" @keyup.enter="handleCreate" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -50,13 +50,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../store/user'
 import { getMyTheses, createThesis, forceSync } from '../api/thesis'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const theses = ref([])
@@ -64,6 +65,23 @@ const showCreateDialog = ref(false)
 const createForm = ref({ title: '' })
 const isSyncing = ref(false)
 const loading = ref(false)
+const searchKeyword = ref(route.query.search || '')
+
+// 前端过滤搜索
+const filteredTheses = computed(() => {
+  if (!searchKeyword.value) return theses.value
+  const kw = searchKeyword.value.toLowerCase()
+  return theses.value.filter(t =>
+    (t.title && t.title.toLowerCase().includes(kw)) ||
+    (t.studentName && t.studentName.toLowerCase().includes(kw)) ||
+    (t.studentUsername && t.studentUsername.toLowerCase().includes(kw))
+  )
+})
+
+// 监听路由 query 参数变化
+watch(() => route.query.search, (val) => {
+  searchKeyword.value = val || ''
+})
 
 const isTeacher = computed(() => {
   return userStore.role === 'TEACHER' || userStore.role === 'ADMIN'
@@ -113,6 +131,10 @@ const handleForceSync = async () => {
 
 const viewDetail = (id) => {
   router.push(`/thesis/${id}`)
+}
+
+const handleRowClick = (row) => {
+  viewDetail(row.id)
 }
 
 const getStatusType = (status) => {
@@ -165,5 +187,13 @@ onMounted(() => {
 .header-buttons {
   display: flex;
   gap: 12px;
+}
+
+:deep(.clickable-row) {
+  cursor: pointer;
+}
+
+:deep(.clickable-row:hover) > td {
+  background-color: #ecf5ff !important;
 }
 </style>

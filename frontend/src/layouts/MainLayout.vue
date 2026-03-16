@@ -66,7 +66,11 @@
         <div class="header-left">
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item v-for="item in breadcrumbs" :key="item">{{ item }}</el-breadcrumb-item>
+            <el-breadcrumb-item
+              v-for="item in breadcrumbs"
+              :key="item.label"
+              :to="item.to ? { path: item.to } : undefined"
+            >{{ item.label }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
 
@@ -76,6 +80,7 @@
             placeholder="搜索论文..."
             class="global-search"
             clearable
+            @keyup.enter="handleSearch"
           >
             <template #prefix>
               <el-icon><search /></el-icon>
@@ -117,6 +122,7 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLayoutStore } from '@/store/layout'
 import { useUserStore } from '@/store/user'
+import { ElMessageBox } from 'element-plus'
 import {
   House,
   Files,
@@ -149,10 +155,25 @@ const breadcrumbs = computed(() => {
   return route.meta.breadcrumb || []
 })
 
-const handleCommand = (command) => {
+const handleSearch = () => {
+  if (searchQuery.value.trim()) {
+    router.push({ path: '/theses', query: { search: searchQuery.value.trim() } })
+  }
+}
+
+const handleCommand = async (command) => {
   if (command === 'logout') {
-    userStore.logout()
-    router.push('/login')
+    try {
+      await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+      userStore.logout()
+      router.push('/login')
+    } catch {
+      // 用户取消
+    }
   } else if (command === 'profile') {
     // Navigate to profile
   }

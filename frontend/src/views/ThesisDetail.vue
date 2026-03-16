@@ -3,7 +3,12 @@
     <el-card class="detail-card">
       <template #header>
         <div class="card-header">
-          <span class="title">{{ thesis?.title || '版本管理' }}</span>
+          <span class="title">
+            <el-button link @click="router.push('/theses')" class="back-btn">
+              <el-icon size="18"><arrow-left /></el-icon>
+            </el-button>
+            {{ thesis?.title || '版本管理' }}
+          </span>
           <div class="header-buttons">
             <el-button type="primary" @click="showUploadDialog = true">
               上传新版本
@@ -79,7 +84,7 @@
     <!-- 版本对比 Dialog -->
     <el-dialog
       v-model="showCompareDialog"
-      title="版本对比"
+      :title="compareDialogTitle"
       fullscreen
       destroy-on-close
     >
@@ -101,6 +106,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getVersions, uploadVersion, downloadVersion, getThesis } from '../api/thesis'
 import { ElMessage } from 'element-plus'
 import { useLayoutStore } from '@/store/layout'
+import { ArrowLeft } from '@element-plus/icons-vue'
 
 // 懒加载 VersionComparer 组件
 const VersionComparer = defineAsyncComponent(() =>
@@ -133,6 +139,20 @@ const sortedSelectedVersions = computed(() => {
     // 同一时间按版本号比
     return b.versionNum - a.versionNum
   })
+})
+
+// 对比弹窗标题：显示文件名
+const compareDialogTitle = computed(() => {
+  if (selectedVersions.value.length === 1) {
+    const name = formatFileName(selectedVersions.value[0].filePath)
+    return `查看: ${name || '文档'}`
+  }
+  if (sortedSelectedVersions.value.length >= 2) {
+    const newName = formatFileName(sortedSelectedVersions.value[0].filePath)
+    const oldName = formatFileName(sortedSelectedVersions.value[1].filePath)
+    return `对比: ${newName || '新版本'} ↔ ${oldName || '旧版本'}`
+  }
+  return '版本对比'
 })
 
 // 格式化文件名：移除路径和 UUID 前缀
@@ -262,5 +282,11 @@ onMounted(() => {
 .header-buttons {
   display: flex;
   gap: 12px;
+}
+
+.back-btn {
+  padding: 0 4px 0 0;
+  font-size: 18px;
+  vertical-align: middle;
 }
 </style>

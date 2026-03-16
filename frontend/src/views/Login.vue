@@ -4,23 +4,23 @@
       <h2>毕业论文管理系统</h2>
       <el-tabs v-model="activeTab">
         <el-tab-pane label="登录" name="login">
-          <el-form :model="loginForm" :rules="loginRules" ref="loginFormRef">
+          <el-form :model="loginForm" :rules="loginRules" ref="loginFormRef" @submit.prevent="handleLogin">
             <el-form-item prop="username">
-              <el-input v-model="loginForm.username" placeholder="用户名" />
+              <el-input v-model="loginForm.username" placeholder="用户名" autofocus />
             </el-form-item>
             <el-form-item prop="password">
-              <el-input v-model="loginForm.password" type="password" placeholder="密码" />
+              <el-input v-model="loginForm.password" type="password" placeholder="密码" show-password @keyup.enter="handleLogin" />
             </el-form-item>
             <el-button type="primary" @click="handleLogin" style="width: 100%">登录</el-button>
           </el-form>
         </el-tab-pane>
         <el-tab-pane label="注册" name="register">
-          <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef">
+          <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" @submit.prevent="handleRegister">
             <el-form-item prop="username">
               <el-input v-model="registerForm.username" placeholder="用户名" />
             </el-form-item>
             <el-form-item prop="password">
-              <el-input v-model="registerForm.password" type="password" placeholder="密码" />
+              <el-input v-model="registerForm.password" type="password" placeholder="密码" show-password />
             </el-form-item>
             <el-form-item prop="role">
               <el-select v-model="registerForm.role" placeholder="选择角色" style="width: 100%">
@@ -32,7 +32,7 @@
               <el-input v-model="registerForm.realName" placeholder="真实姓名" />
             </el-form-item>
             <el-form-item prop="email">
-              <el-input v-model="registerForm.email" placeholder="邮箱" />
+              <el-input v-model="registerForm.email" placeholder="邮箱" @keyup.enter="handleRegister" />
             </el-form-item>
             <el-button type="primary" @click="handleRegister" style="width: 100%">注册</el-button>
           </el-form>

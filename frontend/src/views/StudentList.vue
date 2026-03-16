@@ -95,7 +95,7 @@
           <span>{{ resetTarget.realName }}（{{ resetTarget.username }}）</span>
         </el-form-item>
         <el-form-item label="新密码" prop="newPassword">
-          <el-input v-model="resetFormData.newPassword" type="password" show-password placeholder="请输入新密码" />
+          <el-input v-model="resetFormData.newPassword" type="password" show-password placeholder="请输入新密码" @keyup.enter="handleResetPassword" />
         </el-form-item>
       </el-form>
       <template #footer>
