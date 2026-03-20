@@ -71,3 +71,12 @@ export function forceSync() {
     method: 'post'
   })
 }
+
+// 分析论文（自动取最新版本，执行摘要/目录/参考文献/引用检测）
+export function analyzeThesis(thesisId) {
+  return request({
+    url: `/thesis/${thesisId}/analyze`,
+    method: 'get',
+    timeout: 120000 // 文献验证耗时较长，2分钟超时
+  })
+}

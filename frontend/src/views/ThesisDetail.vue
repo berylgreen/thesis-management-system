@@ -10,6 +10,9 @@
             {{ thesis?.title || '版本管理' }}
           </span>
           <div class="header-buttons">
+            <el-button type="warning" @click="showAnalysisDialog = true">
+              论文分析
+            </el-button>
             <el-button type="primary" @click="showUploadDialog = true">
               上传新版本
             </el-button>
@@ -97,6 +100,19 @@
         :single-view-mode="selectedVersions.length === 1"
       />
     </el-dialog>
+
+    <!-- 论文分析 Dialog -->
+    <el-dialog
+      v-model="showAnalysisDialog"
+      title="论文分析"
+      fullscreen
+      destroy-on-close
+    >
+      <ThesisAnalysis
+        v-if="showAnalysisDialog"
+        :thesis-id="thesisId"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -108,9 +124,12 @@ import { ElMessage } from 'element-plus'
 import { useLayoutStore } from '@/store/layout'
 import { ArrowLeft } from '@element-plus/icons-vue'
 
-// 懒加载 VersionComparer 组件
+// 懒加载组件
 const VersionComparer = defineAsyncComponent(() =>
   import('../components/VersionComparer.vue')
+)
+const ThesisAnalysis = defineAsyncComponent(() =>
+  import('../components/ThesisAnalysis.vue')
 )
 
 const route = useRoute()
@@ -122,6 +141,7 @@ const thesis = ref(null)
 const versions = ref([])
 const showUploadDialog = ref(false)
 const showCompareDialog = ref(false)
+const showAnalysisDialog = ref(false)
 const selectedVersions = ref([])
 const uploadForm = ref({ remark: '' })
 const uploadFile = ref(null)

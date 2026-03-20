@@ -1,10 +1,12 @@
 package com.thesis.controller;
 
+import com.thesis.dto.ThesisAnalysisResult;
 import com.thesis.dto.ThesisDTO;
 import com.thesis.entity.Thesis;
 import com.thesis.entity.ThesisVersion;
 import com.thesis.entity.User;
 import com.thesis.mapper.UserMapper;
+import com.thesis.service.ThesisAnalysisService;
 import com.thesis.service.ThesisService;
 import com.thesis.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,9 @@ public class ThesisController {
 
     @Autowired
     private ThesisService thesisService;
+
+    @Autowired
+    private ThesisAnalysisService thesisAnalysisService;
 
     @Autowired
     private UserMapper userMapper;
@@ -141,6 +146,28 @@ public class ThesisController {
             return Result.success("强制同步完成", result);
         } catch (Exception e) {
             return Result.error("同步失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 分析论文（自动取最新版本）
+     * 执行摘要提取、目录分析、参考文献验证、引用检测
+     */
+    @GetMapping("/{thesisId}/analyze")
+    public Result<ThesisAnalysisResult> analyzeThesis(
+            @PathVariable Long thesisId, Authentication auth) {
+        try {
+            Long userId = (Long) auth.getPrincipal();
+            User user = userMapper.selectById(userId);
+            if (user == null) {
+                return Result.error("用户不存在");
+            }
+
+            ThesisAnalysisResult result = thesisAnalysisService.analyzeThesis(
+                    thesisId, userId, user.getRole());
+            return Result.success("分析完成", result);
+        } catch (Exception e) {
+            return Result.error("分析失败: " + e.getMessage());
         }
     }
 }
