@@ -1,4 +1,4 @@
-# 开发环境管理脚本 (Unified)
+# 开发环境管理脚本
 
 param (
     [Parameter(Mandatory = $true)]
@@ -12,10 +12,7 @@ $logDir = Resolve-Path "."
 
 function Show-Status {
     Write-Host "`n--- Service Status ---" -ForegroundColor Cyan
-    
-    # Check Docker
-    $dockerRunning = (docker ps -q -f "name=thesis-mysql-dev" | Measure-Object).Count -gt 0
-    if ($dockerRunning) { Write-Host "Docker Services: RUNNING" -ForegroundColor Green } else { Write-Host "Docker Services: STOPPED" -ForegroundColor Red }
+    Write-Host "Database:        H2 (embedded)" -ForegroundColor DarkCyan
 
     # Check Backend Port 8080
     if (Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue) { Write-Host "Backend (8080):  RUNNING" -ForegroundColor Green } else { Write-Host "Backend (8080):  STOPPED" -ForegroundColor Red }
@@ -26,25 +23,21 @@ function Show-Status {
 }
 
 function Start-Services {
-    Write-Host "Starting Thesis Development Environment..." -ForegroundColor Green
+    Write-Host "Starting Thesis Dev Environment (H2 embedded, no external dependencies)..." -ForegroundColor Green
 
-    # 1. Start Docker
-    Write-Host "Starting Docker containers..." -ForegroundColor Cyan
-    docker-compose -f docker-compose.dev.yml up -d
-
-    # 2. Start Backend
+    # Start Backend with dev profile (H2)
     Write-Host "Starting Backend Service (check backend.log for output)..." -ForegroundColor Cyan
     $backendLog = "$logDir\backend.log"
     $backendErr = "$logDir\backend.err.log"
-    
-    $pBack = Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d ""$backendPath"" && C:\tools\apache-maven-3.9.9\bin\mvn spring-boot:run > ""$backendLog"" 2> ""$backendErr""" -WindowStyle Hidden -PassThru
+
+    $pBack = Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d ""$backendPath"" && C:\tools\apache-maven-3.9.9\bin\mvn spring-boot:run -Dspring-boot.run.profiles=dev > ""$backendLog"" 2> ""$backendErr""" -WindowStyle Hidden -PassThru
     $pBack.Id | Out-File "$logDir\backend.pid"
-    
-    # 3. Start Frontend
+
+    # Start Frontend
     Write-Host "Starting Frontend Service (check frontend.log for output)..." -ForegroundColor Cyan
     $frontendLog = "$logDir\frontend.log"
     $frontendErr = "$logDir\frontend.err.log"
-    
+
     $pFront = Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d ""$frontendPath"" && npm run dev > ""$frontendLog"" 2> ""$frontendErr""" -WindowStyle Hidden -PassThru
     $pFront.Id | Out-File "$logDir\frontend.pid"
 
@@ -57,9 +50,6 @@ function Start-Services {
 
 function Stop-Services {
     Write-Host "Stopping Services..." -ForegroundColor Yellow
-    
-    # Stop Docker
-    docker-compose -f docker-compose.dev.yml down
 
     # Helper to kill by PID file
     function Kill-By-PidFile ($pidFile, $name) {
@@ -67,8 +57,6 @@ function Stop-Services {
             $pidTarget = Get-Content $pidFile
             Write-Host "Stopping $name (PID: $pidTarget)..." -ForegroundColor Yellow
             try {
-                # /T terminates the process and any child processes
-                # /F forces termination
                 Start-Process -FilePath "taskkill" -ArgumentList "/F /T /PID $pidTarget" -WindowStyle Hidden -Wait
                 Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
             } catch {
@@ -80,7 +68,7 @@ function Stop-Services {
     Kill-By-PidFile "$logDir\backend.pid" "Backend"
     Kill-By-PidFile "$logDir\frontend.pid" "Frontend"
 
-    # Fallback: Kill by Port function
+    # Fallback: Kill by Port
     function Kill-Port ($p, $n) {
         $conn = Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue
         if ($conn) {

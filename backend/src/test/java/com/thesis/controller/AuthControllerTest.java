@@ -36,7 +36,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration," +
-                "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration," +
                 "com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration"
 })
 @AutoConfigureMockMvc

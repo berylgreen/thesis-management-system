@@ -26,12 +26,7 @@ const routes = [
         component: () => import('../views/ThesisList.vue'),
         meta: { breadcrumb: [{ label: '论文管理', to: '/theses' }, { label: '论文列表' }] }
       },
-      {
-        path: 'thesis/:id',
-        name: 'ThesisDetail',
-        component: () => import('../views/ThesisDetail.vue'),
-        meta: { breadcrumb: [{ label: '论文管理', to: '/theses' }, { label: '论文详情' }] }
-      },
+
       {
         path: 'students',
         name: 'StudentList',

@@ -20,6 +20,9 @@
             <el-button type="primary" @click="openCreateDialog">
               <el-icon><plus /></el-icon> 新增学生
             </el-button>
+            <el-button type="success" @click="handleSyncAllTitles">
+              一键统一论文题目
+            </el-button>
           </div>
         </div>
       </template>
@@ -158,7 +161,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { getStudents, createStudent, updateStudent, deleteStudent, resetPassword, getStudentTheses, batchRenameFiles } from '../api/student'
+import { getStudents, createStudent, updateStudent, deleteStudent, resetPassword, getStudentTheses, batchRenameFiles, syncAllThesisTitles } from '../api/student'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Edit } from '@element-plus/icons-vue'
 
@@ -290,6 +293,26 @@ const handleDelete = async (row) => {
     )
     await deleteStudent(row.id)
     ElMessage.success('删除成功')
+    loadStudents()
+  } catch (error) {
+    if (error !== 'cancel') console.error(error)
+  }
+}
+
+// ============ 一键统一论文题目 ============
+
+const handleSyncAllTitles = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将所有学生预设的论文题目同步到其名下的论文记录。未设置论文题目的学生将被跳过。',
+      '一键统一论文题目',
+      { type: 'info', confirmButtonText: '确定执行', cancelButtonText: '取消' }
+    )
+    const res = await syncAllThesisTitles()
+    const d = res.data
+    let msg = `统一完成：${d.students} 个学生、${d.renamed} 个文件已重命名`
+    if (d.failed > 0) msg += `，${d.failed} 个失败`
+    ElMessage.success(msg)
     loadStudents()
   } catch (error) {
     if (error !== 'cancel') console.error(error)

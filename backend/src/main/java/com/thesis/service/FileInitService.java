@@ -84,18 +84,19 @@ public class FileInitService implements CommandLineRunner {
     }
 
     /**
-     * 从学生目录下最新文件名中提取论文题目
+     * 从 uploads 根目录下按学号筛选文件，从最新文件名中提取论文题目
      */
     private String extractLatestTitle(File uploadDir, String username) {
-        File studentDir = new File(uploadDir, username);
-        if (!studentDir.exists() || !studentDir.isDirectory()) {
+        if (!uploadDir.exists() || !uploadDir.isDirectory()) {
             return null;
         }
 
-        File[] files = studentDir.listFiles(file ->
-            file.isFile() && (file.getName().endsWith(".docx") ||
-                              file.getName().endsWith(".doc") ||
-                              file.getName().endsWith(".pdf")));
+        // 直接在 uploads 根目录按文件名包含学号筛选
+        File[] files = uploadDir.listFiles(file ->
+            file.isFile() && file.getName().contains(username) &&
+            (file.getName().endsWith(".docx") ||
+             file.getName().endsWith(".doc") ||
+             file.getName().endsWith(".pdf")));
 
         if (files == null || files.length == 0) {
             return null;
@@ -128,68 +129,72 @@ public class FileInitService implements CommandLineRunner {
             return;
         }
 
-        File[] studentDirs = uploadDir.listFiles(File::isDirectory);
-        if (studentDirs == null || studentDirs.length == 0) {
-            log.info("uploads 目录为空");
+        // 直接扫描 uploads 根目录下的论文文件（扁平结构，无学号子目录）
+        File[] files = uploadDir.listFiles(file ->
+            file.isFile() && (file.getName().endsWith(".docx") ||
+                              file.getName().endsWith(".doc") ||
+                              file.getName().endsWith(".pdf")));
+
+        if (files == null || files.length == 0) {
+            log.info("uploads 目录下没有论文文件");
             return;
         }
 
         int processedFiles = 0;
         int skippedFiles = 0;
 
-        for (File studentDir : studentDirs) {
-            String studentUsername = studentDir.getName();
-            log.info("处理学生文件夹: {}", studentUsername);
+        for (File file : files) {
+            try {
+                // 从文件名正则提取学号和姓名
+                Matcher matcher = FILE_PATTERN.matcher(file.getName());
+                if (!matcher.matches()) {
+                    log.warn("文件名格式不匹配，无法提取学号: {}", file.getName());
+                    skippedFiles++;
+                    continue;
+                }
 
-            // 查找或创建学生用户
-            User student = findOrCreateStudent(studentUsername);
-            if (student == null) {
-                log.warn("无法为学号 {} 创建用户，跳过", studentUsername);
-                continue;
-            }
+                String realName = matcher.group(1);        // 姓名
+                String studentUsername = matcher.group(2);  // 学号
+                User student = findOrCreateStudent(studentUsername, realName);
+                if (student == null) {
+                    log.warn("无法为学号 {} 创建用户，跳过文件: {}", studentUsername, file.getName());
+                    skippedFiles++;
+                    continue;
+                }
 
-            // 扫描该学生的所有论文文件
-            File[] files = studentDir.listFiles(file ->
-                file.isFile() && (file.getName().endsWith(".docx") ||
-                                  file.getName().endsWith(".doc") ||
-                                  file.getName().endsWith(".pdf")));
-
-            if (files == null || files.length == 0) {
-                log.info("学生 {} 没有论文文件", studentUsername);
-                continue;
-            }
-
-            for (File file : files) {
-                try {
-                    if (processFile(student, file)) {
-                        processedFiles++;
-                    } else {
-                        skippedFiles++;
-                    }
-                } catch (Exception e) {
-                    log.error("处理文件失败: {}", file.getName(), e);
+                if (processFile(student, file)) {
+                    processedFiles++;
+                } else {
                     skippedFiles++;
                 }
+            } catch (Exception e) {
+                log.error("处理文件失败: {}", file.getName(), e);
+                skippedFiles++;
             }
         }
 
         log.info("扫描完成! 处理: {} 个文件, 跳过: {} 个文件", processedFiles, skippedFiles);
     }
 
-    private User findOrCreateStudent(String username) {
+    private User findOrCreateStudent(String username, String realName) {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getUsername, username);
         User user = userMapper.selectOne(wrapper);
 
         if (user == null) {
-            log.info("用户 {} 不存在，创建新用户", username);
+            log.info("用户 {} 不存在，创建新用户（姓名: {}）", username, realName);
             user = new User();
             user.setUsername(username);
             user.setPasswordHash("$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi"); // 默认密码 admin123
             user.setRole("STUDENT");
-            user.setRealName(username);
+            user.setRealName(realName != null && !realName.isEmpty() ? realName : username);
             user.setEmail(username + "@student.edu.cn");
             userMapper.insert(user);
+        } else if (realName != null && !realName.isEmpty() && username.equals(user.getRealName())) {
+            // 已有用户的 realName 仍是学号，用文件名中的姓名修正
+            log.info("修正用户 {} 的姓名: {} -> {}", username, user.getRealName(), realName);
+            user.setRealName(realName);
+            userMapper.updateById(user);
         }
 
         return user;

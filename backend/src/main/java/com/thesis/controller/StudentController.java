@@ -139,6 +139,19 @@ public class StudentController {
     }
 
     /**
+     * 一键统一所有学生论文题目：遍历所有学生，将预设的论文题目同步到论文记录
+     */
+    @PutMapping("/sync-all-titles")
+    public Result<java.util.Map<String, Object>> syncAllTitles(Authentication auth) {
+        try {
+            checkPermission(auth);
+            return Result.success("论文题目统一完成", studentService.syncAllThesisTitles());
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
      * 批量重命名论文版本文件为规范格式
      * 请求体: { studentId, versionIds: [1,2,3] }
      */

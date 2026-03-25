@@ -157,6 +157,132 @@ public class StudentService {
     }
 
     /**
+     * 一键统一所有学生论文题目：遍历所有已设置 thesisTitle 的学生，
+     * 1. 将 User.thesisTitle 同步到 Thesis.title
+     * 2. 将所有论文版本的物理文件重命名为: 姓名学号_论文题目_日期.ext
+     * @return 统计结果
+     */
+    public java.util.Map<String, Object> syncAllThesisTitles() {
+        // 查询所有已设置论文题目的学生
+        LambdaQueryWrapper<User> sw = new LambdaQueryWrapper<>();
+        sw.eq(User::getRole, "STUDENT")
+          .isNotNull(User::getThesisTitle)
+          .ne(User::getThesisTitle, "");
+        java.util.List<User> students = userMapper.selectList(sw);
+
+        int processedStudents = 0;
+        int renamedFiles = 0;
+        int skippedStudents = 0;
+        int failedFiles = 0;
+        java.util.List<String> errors = new java.util.ArrayList<>();
+
+        // 文件名提取日期的正则: 姓名学号_题目_日期[_序号].ext
+        java.util.regex.Pattern datePattern = java.util.regex.Pattern.compile("_(\\d{8})(?:_(\\d+))?\\.[^.]+$");
+
+        for (User student : students) {
+            String thesisTitle = student.getThesisTitle();
+
+            // 1. 查询该学生所有论文，同步 Thesis.title
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.thesis.entity.Thesis> tw =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            tw.eq(com.thesis.entity.Thesis::getStudentId, student.getId());
+            java.util.List<com.thesis.entity.Thesis> theses = thesisMapper.selectList(tw);
+
+            if (theses.isEmpty()) {
+                skippedStudents++;
+                continue;
+            }
+
+            boolean hasWork = false;
+
+            for (com.thesis.entity.Thesis thesis : theses) {
+                // 同步数据库中的论文标题
+                if (!thesisTitle.equals(thesis.getTitle())) {
+                    thesis.setTitle(thesisTitle);
+                    thesisMapper.updateById(thesis);
+                }
+
+                // 2. 查询该论文所有版本，重命名物理文件
+                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.thesis.entity.ThesisVersion> vw =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                vw.eq(com.thesis.entity.ThesisVersion::getThesisId, thesis.getId());
+                java.util.List<com.thesis.entity.ThesisVersion> versions = thesisVersionMapper.selectList(vw);
+
+                for (com.thesis.entity.ThesisVersion version : versions) {
+                    try {
+                        java.io.File oldFile = new java.io.File(version.getFilePath());
+                        if (!oldFile.exists()) continue;
+
+                        String oldName = oldFile.getName();
+                        String ext = oldName.substring(oldName.lastIndexOf('.'));
+
+                        // 提取日期
+                        java.util.regex.Matcher dateMatcher = datePattern.matcher(oldName);
+                        String dateStr;
+                        String suffix = "";
+                        if (dateMatcher.find()) {
+                            dateStr = dateMatcher.group(1);
+                            if (dateMatcher.group(2) != null) {
+                                suffix = "_" + dateMatcher.group(2);
+                            }
+                        } else {
+                            java.time.LocalDateTime modTime = java.time.Instant.ofEpochMilli(oldFile.lastModified())
+                                .atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+                            dateStr = modTime.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+                        }
+
+                        // 构建新文件名
+                        String newName = student.getRealName() + student.getUsername() + "_" + thesisTitle + "_" + dateStr + suffix + ext;
+                        java.io.File newFile = new java.io.File(oldFile.getParent(), newName);
+
+                        // 文件名相同则跳过
+                        if (oldFile.getName().equals(newName)) continue;
+
+                        // 目标文件已存在时追加序号
+                        if (newFile.exists()) {
+                            String baseName = newName.substring(0, newName.lastIndexOf('.'));
+                            String extName = newName.substring(newName.lastIndexOf('.'));
+                            int counter = 1;
+                            while (newFile.exists()) {
+                                newName = baseName + "_" + counter + extName;
+                                newFile = new java.io.File(oldFile.getParent(), newName);
+                                counter++;
+                            }
+                        }
+
+                        if (oldFile.renameTo(newFile)) {
+                            version.setFilePath(newFile.getAbsolutePath());
+                            thesisVersionMapper.updateById(version);
+                            renamedFiles++;
+                            hasWork = true;
+                        } else {
+                            errors.add(student.getRealName() + ": 重命名失败 " + oldName);
+                            failedFiles++;
+                        }
+                    } catch (Exception e) {
+                        errors.add(student.getRealName() + ": " + e.getMessage());
+                        failedFiles++;
+                    }
+                }
+            }
+
+            if (hasWork) {
+                processedStudents++;
+            } else {
+                skippedStudents++;
+            }
+        }
+
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("students", processedStudents);
+        result.put("renamed", renamedFiles);
+        result.put("failed", failedFiles);
+        result.put("skipped", skippedStudents);
+        result.put("errors", errors);
+        return result;
+    }
+
+    /**
      * 批量重命名论文版本文件为规范格式: 学号_姓名_论文题目_日期.ext
      */
     public java.util.Map<String, Object> batchRenameFiles(StudentDTO.BatchRenameRequest request) {

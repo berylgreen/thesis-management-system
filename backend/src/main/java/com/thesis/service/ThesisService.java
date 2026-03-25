@@ -70,7 +70,7 @@ public class ThesisService {
         }
 
         String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-        Path filePath = Paths.get(uploadPath, thesisId.toString(), fileName);
+        Path filePath = Paths.get(uploadPath, fileName);
         Files.createDirectories(filePath.getParent());
         file.transferTo(filePath.toFile());
 

@@ -35,12 +35,7 @@ const routes = [
         component: { render: () => {} },
         meta: { breadcrumb: ['论文管理', '论文列表'] }
       },
-      {
-        path: 'thesis/:id',
-        name: 'ThesisDetail',
-        component: { render: () => {} },
-        meta: { breadcrumb: ['论文管理', '论文详情'] }
-      }
+
     ]
   }
 ];
@@ -114,15 +109,4 @@ describe('Vue Router Navigation Logic', () => {
     expect(router.currentRoute.value.meta.breadcrumb).toEqual(['论文管理', '论文列表']);
   });
 
-  it('从 /theses 导航到 /thesis/:id, 面包屑应该被正确更新', async () => {
-    useUserStore.mockReturnValue({ token: 'fake-token-for-meta-update' });
-
-    await router.push('/theses');
-    await router.isReady();
-    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['论文管理', '论文列表']);
-
-    await router.push('/thesis/123');
-    await router.isReady();
-    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['论文管理', '论文详情']);
-  });
 });

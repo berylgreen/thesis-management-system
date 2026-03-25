@@ -35,3 +35,6 @@ backend/src/main/resources/application-local.yml
 .ace-tool/
 *.pid
 source/
+
+# H2 Database
+backend/data/

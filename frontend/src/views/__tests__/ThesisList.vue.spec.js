@@ -11,12 +11,19 @@ import { ElMessage } from 'element-plus'
 
 vi.mock('@/api/thesis', () => ({
   getMyTheses: vi.fn().mockResolvedValue({ data: [] }),
-  forceSync: vi.fn()
+  createThesis: vi.fn(),
+  forceSync: vi.fn(),
+  getVersions: vi.fn().mockResolvedValue({ data: [] }),
+  uploadVersion: vi.fn(),
+  downloadVersion: vi.fn()
 }))
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: vi.fn()
+  }),
+  useRoute: () => ({
+    query: {}
   }),
   RouterLink: {
     template: '<a><slot/></a>'
@@ -29,7 +36,8 @@ vi.mock('element-plus', async (importOriginal) => {
     ...original,
     ElMessage: {
       success: vi.fn(),
-      error: vi.fn()
+      error: vi.fn(),
+      warning: vi.fn()
     }
   }
 })
@@ -76,63 +84,48 @@ describe('ThesisList.vue', () => {
 
     beforeEach(() => {
       wrapper = mountComponentWithRole('TEACHER')
-      // The component calls getMyTheses in onMounted. Clear this call
-      // so we can cleanly assert the call made by the sync handler.
       getMyTheses.mockClear();
     })
 
     it('handles successful sync, shows success message, and reloads data', async () => {
-      // Arrange
-      const syncResult = { deletedVersions: 5, deletedTheses: 2 }
+      const syncResult = { deletedVersions: 5, deletedTheses: 2, mergedTheses: 0 }
       forceSync.mockResolvedValue({ data: syncResult })
 
-      // Act
       await wrapper.find('[data-testid="force-sync-button"]').trigger('click')
       await new Promise(resolve => setTimeout(resolve, 0)); 
 
-      // Assert
       expect(forceSync).toHaveBeenCalledTimes(1)
-      expect(ElMessage.success).toHaveBeenCalledWith(`同步完成！删除 ${syncResult.deletedVersions} 个版本, ${syncResult.deletedTheses} 篇论文`)
-      // Test the side-effect of loadTheses(), which is calling getMyTheses()
+      expect(ElMessage.success).toHaveBeenCalledWith(`同步完成！删除 ${syncResult.deletedVersions} 个版本, ${syncResult.deletedTheses} 篇论文, 合并 ${syncResult.mergedTheses} 篇重复论文`)
       expect(getMyTheses).toHaveBeenCalledTimes(1)
       expect(wrapper.vm.isSyncing).toBe(false)
     })
     
     it('handles sync failure and shows an error message', async () => {
-      // Arrange
       const errorMessage = 'Network Error'
       forceSync.mockRejectedValue(new Error(errorMessage))
 
-      // Act
       await wrapper.find('[data-testid="force-sync-button"]').trigger('click')
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Assert
       expect(forceSync).toHaveBeenCalledTimes(1)
       expect(ElMessage.error).toHaveBeenCalledWith('同步失败: ' + errorMessage)
-      // On failure, the data should not be reloaded
       expect(getMyTheses).not.toHaveBeenCalled()
       expect(wrapper.vm.isSyncing).toBe(false)
     })
 
     it('shows loading state on button while syncing', async () => {
-      // Arrange
       let resolvePromise;
       const promise = new Promise(resolve => { resolvePromise = resolve; });
       forceSync.mockReturnValue(promise);
       
-      // Act
       await wrapper.find('[data-testid="force-sync-button"]').trigger('click')
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.vm.isSyncing).toBe(true)
       
-      // Act
       resolvePromise({ data: {} });
       await new Promise(resolve => setTimeout(resolve, 0));
 
-      // Assert
       expect(wrapper.vm.isSyncing).toBe(false)
     })
   })

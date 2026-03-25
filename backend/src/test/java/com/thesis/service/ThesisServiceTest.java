@@ -58,14 +58,14 @@ class ThesisServiceTest {
         version1.setId(1L);
         version1.setThesisId(100L);
         version1.setVersionNum(1);
-        version1.setFilePath("/uploads/100/v1.txt");
+        version1.setFilePath("/uploads/v1.txt");
         version1.setContentHash("hash123");
 
         version2 = new ThesisVersion();
         version2.setId(2L);
         version2.setThesisId(100L);
         version2.setVersionNum(2);
-        version2.setFilePath("/uploads/100/v2.txt");
+        version2.setFilePath("/uploads/v2.txt");
         version2.setContentHash("hash456");
 
         thesis = new Thesis();

@@ -165,7 +165,7 @@ def main():
         new_filename = f"{student_name}{student_id}_{title}_{date_str}{ext}"
 
         # 目标路径
-        dest_dir = os.path.join(DEST_UPLOADS_DIR, student_id)
+        dest_dir = DEST_UPLOADS_DIR
         os.makedirs(dest_dir, exist_ok=True)
         dest_path = os.path.join(dest_dir, new_filename)
 
@@ -180,7 +180,7 @@ def main():
         if counter > 1:
             print(f"  [RENAME] 冲突重命名: {new_filename}")
 
-        print(f"[MOVE] {filename}\n    -> {student_id}/{new_filename}")
+        print(f"[MOVE] {filename}\n    -> {new_filename}")
         shutil.copy2(file_path, dest_path)
         moved += 1
 

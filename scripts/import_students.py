@@ -58,16 +58,9 @@ def generate_sql(students, output_file):
 def create_directories(students, base_upload_dir):
     if not os.path.exists(base_upload_dir):
         os.makedirs(base_upload_dir)
-        print(f"[DIR] 创建基础目录: {base_upload_dir}")
-        
-    count = 0
-    for s in students:
-        student_dir = os.path.join(base_upload_dir, s['id'])
-        if not os.path.exists(student_dir):
-            os.makedirs(student_dir)
-            count += 1
-            
-    print(f"[DIR] 已为 {count} 位新学生创建上传目录")
+        print(f"[DIR] 创建上传目录: {base_upload_dir}")
+    else:
+        print(f"[DIR] 上传目录已存在: {base_upload_dir}")
 
 def main():
     print("开始导入流程...")

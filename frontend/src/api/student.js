@@ -76,6 +76,16 @@ export function getStudentTheses(id) {
 }
 
 /**
+ * 一键统一所有学生论文题目
+ */
+export function syncAllThesisTitles() {
+  return request({
+    url: '/students/sync-all-titles',
+    method: 'put'
+  })
+}
+
+/**
  * 批量重命名论文版本文件
  */
 export function batchRenameFiles(data) {

@@ -34,22 +34,7 @@
           <template #title>学生管理</template>
         </el-menu-item>
 
-        <!-- Recent Theses Section -->
-        <div v-if="!layoutStore.isSidebarCollapsed && layoutStore.recentTheses.length > 0" class="menu-divider">
-          最近查看
-        </div>
 
-        <el-menu-item
-          v-for="thesis in layoutStore.recentTheses"
-          :key="thesis.id"
-          :index="'/thesis/' + thesis.id"
-          class="recent-item"
-        >
-          <el-icon><document /></el-icon>
-          <template #title>
-            <span class="truncate">{{ thesis.title }}</span>
-          </template>
-        </el-menu-item>
       </el-menu>
 
       <div class="sidebar-footer" @click="layoutStore.toggleSidebar">
@@ -126,7 +111,6 @@ import { ElMessageBox } from 'element-plus'
 import {
   House,
   Files,
-  Document,
   Search,
   ArrowDown,
   School,
@@ -219,23 +203,7 @@ const handleCommand = async (command) => {
   padding-top: 12px;
 }
 
-.menu-divider {
-  padding: 20px 20px 8px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
 
-.recent-item {
-  opacity: 0.8;
-}
-
-.recent-item :deep(.el-menu-item) {
-  height: 40px;
-  line-height: 40px;
-}
 
 .sidebar-footer {
   height: 48px;
