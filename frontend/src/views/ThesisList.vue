@@ -63,7 +63,7 @@
         <el-table-column prop="studentName" label="学生姓名" width="100" v-if="isTeacher" />
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
         <el-table-column prop="currentVersion" label="版本" width="80" align="center" />
-        <el-table-column prop="createdAt" label="创建时间" width="170" />
+        <el-table-column prop="fileDate" label="文件日期" width="120" align="center" />
       </el-table>
     </el-card>
 

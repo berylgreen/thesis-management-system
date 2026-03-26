@@ -88,7 +88,7 @@ public class ThesisController {
                 List<ThesisDTO> theses = thesisService.getAllThesesWithStudent();
                 return Result.success(theses);
             } else {
-                List<Thesis> theses = thesisService.getStudentTheses(userId);
+                List<ThesisDTO> theses = thesisService.getStudentTheses(userId);
                 return Result.success(theses);
             }
         } catch (Exception e) {

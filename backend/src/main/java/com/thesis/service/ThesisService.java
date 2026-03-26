@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,6 +52,9 @@ public class ThesisService {
 
     @Value("${file.upload-path}")
     private String uploadPath;
+
+    // 从文件名中提取日期的正则（匹配最后一个 _YYYYMMDD 模式）
+    private static final Pattern FILE_DATE_PATTERN = Pattern.compile("_(\\d{8})(?:_\\d+)?\\.[^.]+$");
 
     public Thesis createThesis(Long studentId, String title) {
         Thesis thesis = new Thesis();
@@ -94,24 +99,29 @@ public class ThesisService {
         return version;
     }
 
-    public List<Thesis> getStudentTheses(Long studentId) {
+    public List<ThesisDTO> getStudentTheses(Long studentId) {
         LambdaQueryWrapper<Thesis> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Thesis::getStudentId, studentId)
                .orderByAsc(Thesis::getCreatedAt);
         List<Thesis> theses = thesisMapper.selectList(wrapper);
 
-        // 按创建时间升序分配版本号 1, 2, 3...
+        // 按创建时间升序分配版本号 1, 2, 3... 并构建 DTO
         int versionCounter = 0;
+        List<ThesisDTO> dtos = new java.util.ArrayList<>();
         for (Thesis t : theses) {
             versionCounter++;
-            t.setCurrentVersion(versionCounter);
+            ThesisDTO dto = new ThesisDTO();
+            BeanUtils.copyProperties(t, dto);
+            dto.setCurrentVersion(versionCounter);
+            dto.setFileDate(extractFileDateForThesis(t.getId()));
+            dtos.add(dto);
         }
 
         // 返回时按更新时间倒序（最新在前）
-        theses.sort(Comparator.comparing(
-                Thesis::getUpdatedAt,
+        dtos.sort(Comparator.comparing(
+                ThesisDTO::getUpdatedAt,
                 Comparator.nullsLast(Comparator.reverseOrder())));
-        return theses;
+        return dtos;
     }
 
     public List<Thesis> getAllTheses() {
@@ -143,6 +153,8 @@ public class ThesisService {
             BeanUtils.copyProperties(thesis, dto);
             // 设置学生内的时间顺序版本号
             dto.setCurrentVersion(thesisVersionMap.getOrDefault(thesis.getId(), thesis.getCurrentVersion()));
+            // 从文件名提取日期
+            dto.setFileDate(extractFileDateForThesis(thesis.getId()));
 
             User student = userMapper.selectById(thesis.getStudentId());
             if (student != null) {
@@ -310,6 +322,30 @@ public class ThesisService {
         public void setBlocks(List<DiffUtil.ContentBlock> blocks) { this.blocks = blocks; }
         public String getFileName() { return fileName; }
         public void setFileName(String fileName) { this.fileName = fileName; }
+    }
+
+    /**
+     * 从论文的版本文件名中提取日期字符串（格式化为 YYYY-MM-DD）
+     */
+    private String extractFileDateForThesis(Long thesisId) {
+        LambdaQueryWrapper<ThesisVersion> vw = new LambdaQueryWrapper<>();
+        vw.eq(ThesisVersion::getThesisId, thesisId)
+          .orderByDesc(ThesisVersion::getVersionNum)
+          .last("LIMIT 1");
+        ThesisVersion version = thesisVersionMapper.selectOne(vw);
+        if (version == null || version.getFilePath() == null) {
+            return null;
+        }
+        String fileName = new File(version.getFilePath()).getName();
+        Matcher matcher = FILE_DATE_PATTERN.matcher(fileName);
+        if (matcher.find()) {
+            String dateStr = matcher.group(1);  // e.g. "20260326"
+            if (dateStr.length() == 8) {
+                return dateStr.substring(0, 4) + "-" + dateStr.substring(4, 6) + "-" + dateStr.substring(6, 8);
+            }
+            return dateStr;
+        }
+        return null;
     }
 
     private String extractDisplayFileName(String filePath) {
