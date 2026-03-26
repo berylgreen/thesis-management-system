@@ -39,7 +39,7 @@
 
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openThesesDialog(row)">论文</el-button>
+            <el-button link type="primary" @click="goToTheses(row)">论文</el-button>
             <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
             <el-button link type="warning" @click="openResetDialog(row)">重置密码</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
@@ -107,63 +107,18 @@
       </template>
     </el-dialog>
 
-    <!-- 论文列表弹窗 -->
-    <el-dialog
-      v-model="thesesDialogVisible"
-      :title="`${thesesTarget.realName}（${thesesTarget.username}）的论文`"
-      width="900px"
-      destroy-on-close
-    >
-      <div class="theses-toolbar">
-        <el-button
-          type="primary"
-          :disabled="selectedVersionIds.length === 0"
-          :loading="renaming"
-          @click="handleBatchRename"
-        >
-          <el-icon><edit /></el-icon>
-          批量重命名 ({{ selectedVersionIds.length }})
-        </el-button>
-        <span class="rename-hint">
-          格式: {{ thesesTarget.realName }}{{ thesesTarget.username }}_{{ thesesTarget.thesisTitle || '(未设置)' }}_日期.ext
-        </span>
-      </div>
 
-      <div v-loading="thesesLoading">
-        <div v-for="thesis in thesesData" :key="thesis.id" class="thesis-block">
-          <div class="thesis-header">
-            <el-tag size="small" effect="plain">{{ thesis.status }}</el-tag>
-            <span class="thesis-title-text">{{ thesis.title }}</span>
-            <span class="thesis-ver">v{{ thesis.currentVersion }}</span>
-          </div>
-          <el-table
-            :data="thesis.versions"
-            size="small"
-            @selection-change="(rows) => handleVersionSelection(thesis.id, rows)"
-            class="version-table"
-          >
-            <el-table-column type="selection" width="40" />
-            <el-table-column label="版本" width="60" align="center">
-              <template #default="{ row }">v{{ row.versionNum }}</template>
-            </el-table-column>
-            <el-table-column prop="fileName" label="文件名" min-width="300" show-overflow-tooltip />
-            <el-table-column label="大小" width="100">
-              <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
-            </el-table-column>
-            <el-table-column prop="createdAt" label="时间" width="170" />
-          </el-table>
-        </div>
-        <el-empty v-if="!thesesLoading && thesesData.length === 0" description="暂无论文" />
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
-import { getStudents, createStudent, updateStudent, deleteStudent, resetPassword, getStudentTheses, batchRenameFiles, syncAllThesisTitles } from '../api/student'
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { getStudents, createStudent, updateStudent, deleteStudent, resetPassword, syncAllThesisTitles } from '../api/student'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Edit } from '@element-plus/icons-vue'
+import { Search, Plus } from '@element-plus/icons-vue'
+
+const router = useRouter()
 
 // 列表数据
 const students = ref([])
@@ -202,23 +157,10 @@ const resetRules = {
                 { min: 6, message: '密码至少 6 位', trigger: 'blur' }]
 }
 
-// 论文列表
-const thesesDialogVisible = ref(false)
-const thesesLoading = ref(false)
-const thesesTarget = reactive({ id: null, realName: '', username: '', thesisTitle: '' })
-const thesesData = ref([])
-const versionSelections = reactive({})  // { thesisId: [selectedVersionRows] }
-const renaming = ref(false)
-
-const selectedVersionIds = computed(() => {
-  const ids = []
-  for (const rows of Object.values(versionSelections)) {
-    for (const row of rows) {
-      ids.push(row.id)
-    }
-  }
-  return ids
-})
+// 跳转到论文管理页面并筛选该学生
+const goToTheses = (row) => {
+  router.push({ path: '/theses', query: { student: row.realName } })
+}
 
 // ============ 列表操作 ============
 
@@ -343,65 +285,7 @@ const handleResetPassword = async () => {
   }
 }
 
-// ============ 论文列表 & 批量重命名 ============
 
-const openThesesDialog = async (row) => {
-  Object.assign(thesesTarget, { id: row.id, realName: row.realName, username: row.username, thesisTitle: row.thesisTitle || '' })
-  // 清空选择状态
-  Object.keys(versionSelections).forEach(k => delete versionSelections[k])
-  thesesDialogVisible.value = true
-  thesesLoading.value = true
-  try {
-    const res = await getStudentTheses(row.id)
-    thesesData.value = res.data
-  } catch (error) {
-    console.error('加载论文列表失败', error)
-  } finally {
-    thesesLoading.value = false
-  }
-}
-
-const handleVersionSelection = (thesisId, rows) => {
-  versionSelections[thesisId] = rows
-}
-
-const handleBatchRename = async () => {
-  if (!thesesTarget.thesisTitle) {
-    ElMessage.warning('该学生未设置论文题目，请先在编辑中设置')
-    return
-  }
-  try {
-    await ElMessageBox.confirm(
-      `将选中的 ${selectedVersionIds.value.length} 个文件重命名为规范格式？\n格式: ${thesesTarget.realName}${thesesTarget.username}_${thesesTarget.thesisTitle}_日期.ext`,
-      '批量重命名确认',
-      { type: 'info', confirmButtonText: '确定重命名', cancelButtonText: '取消' }
-    )
-    renaming.value = true
-    const res = await batchRenameFiles({
-      studentId: thesesTarget.id,
-      versionIds: selectedVersionIds.value
-    })
-    const data = res.data
-    ElMessage.success(`重命名完成: 成功 ${data.success} 个, 失败 ${data.failed} 个`)
-    if (data.errors && data.errors.length > 0) {
-      console.warn('重命名错误:', data.errors)
-    }
-    // 刷新论文列表
-    const refreshRes = await getStudentTheses(thesesTarget.id)
-    thesesData.value = refreshRes.data
-  } catch (error) {
-    if (error !== 'cancel') console.error(error)
-  } finally {
-    renaming.value = false
-  }
-}
-
-const formatSize = (bytes) => {
-  if (!bytes) return '—'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
 
 onMounted(() => {
   loadStudents()
@@ -448,48 +332,5 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-/* 论文列表弹窗样式 */
-.theses-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f0f5ff;
-  border-radius: 8px;
-}
 
-.rename-hint {
-  font-size: 12px;
-  color: #909399;
-  font-family: monospace;
-}
-
-.thesis-block {
-  margin-bottom: 20px;
-}
-
-.thesis-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.thesis-title-text {
-  font-weight: 600;
-  font-size: 14px;
-  color: #303133;
-}
-
-.thesis-ver {
-  font-size: 12px;
-  color: #909399;
-}
-
-.version-table {
-  border-radius: 6px;
-}
 </style>

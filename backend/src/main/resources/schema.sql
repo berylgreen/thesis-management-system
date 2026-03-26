@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS t_thesis (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     student_id BIGINT NOT NULL,
     title VARCHAR(200) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
     current_version INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -30,7 +29,6 @@ CREATE TABLE IF NOT EXISTS t_thesis (
     FOREIGN KEY (student_id) REFERENCES t_user(id)
 );
 CREATE INDEX IF NOT EXISTS idx_thesis_student_id ON t_thesis(student_id);
-CREATE INDEX IF NOT EXISTS idx_thesis_status ON t_thesis(status);
 
 -- 论文版本表
 CREATE TABLE IF NOT EXISTS t_thesis_version (

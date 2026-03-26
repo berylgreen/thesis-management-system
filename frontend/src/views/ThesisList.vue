@@ -22,20 +22,6 @@
               />
             </el-select>
 
-            <!-- 状态筛选 -->
-            <el-select
-              v-model="filterStatus"
-              placeholder="全部状态"
-              clearable
-              style="width: 130px"
-            >
-              <el-option label="草稿" value="DRAFT" />
-              <el-option label="已提交" value="SUBMITTED" />
-              <el-option label="已批改" value="REVIEWED" />
-              <el-option label="已通过" value="APPROVED" />
-            </el-select>
-
-            <el-divider direction="vertical" />
 
             <!-- 功能按钮 -->
             <el-button type="primary" @click="openUploadDialog" :disabled="!selectedThesis">
@@ -44,8 +30,11 @@
             <el-button type="warning" @click="openAnalysisDialog" :disabled="!selectedThesis">
               论文分析
             </el-button>
-            <el-button type="success" @click="openVersionSelectDialog" :disabled="!selectedThesis">
-              版本对比
+            <el-button type="success" @click="handleDirectCompare" :disabled="selectedTheses.length === 0 || selectedTheses.length > 2" :loading="compareLoading">
+              论文对比 ({{ selectedTheses.length }}/2)
+            </el-button>
+            <el-button type="info" plain @click="openRenameDialog" :disabled="!selectedThesis" v-if="isTeacher">
+              批量重命名
             </el-button>
 
             <el-divider direction="vertical" v-if="isTeacher" />
@@ -61,22 +50,18 @@
       </template>
 
       <el-table
+        ref="thesisTableRef"
         :data="filteredTheses"
         style="width: 100%"
         v-loading="loading"
-        highlight-current-row
-        @current-change="handleCurrentChange"
+        @selection-change="handleSelectionChange"
         row-class-name="clickable-row"
       >
+        <el-table-column type="selection" width="45" />
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="studentUsername" label="学号" width="140" v-if="isTeacher" />
         <el-table-column prop="studentName" label="学生姓名" width="100" v-if="isTeacher" />
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)" effect="light">{{ getStatusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
         <el-table-column prop="currentVersion" label="版本" width="80" align="center" />
         <el-table-column prop="createdAt" label="创建时间" width="170" />
       </el-table>
@@ -118,45 +103,7 @@
       </template>
     </el-dialog>
 
-    <!-- 版本选择 Dialog（选择 1~2 个版本进行查看/对比） -->
-    <el-dialog v-model="showVersionSelectDialog" title="选择版本进行查看/对比" width="700px" destroy-on-close>
-      <el-table
-        :data="versionList"
-        v-loading="versionsLoading"
-        size="small"
-        border
-        stripe
-        @selection-change="handleVersionSelectionChange"
-      >
-        <el-table-column type="selection" width="45" />
-        <el-table-column prop="versionNum" label="版本号" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag size="small">V{{ row.versionNum }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="文件名" min-width="180" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ formatFileName(row.filePath) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="fileSize" label="大小" width="100">
-          <template #default="{ row }">
-            {{ formatSize(row.fileSize) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="上传时间" width="170" />
-      </el-table>
-      <template #footer>
-        <el-button @click="showVersionSelectDialog = false">取消</el-button>
-        <el-button
-          type="primary"
-          :disabled="selectedVersions.length === 0 || selectedVersions.length > 2"
-          @click="startCompare"
-        >
-          {{ selectedVersions.length <= 1 ? '查看' : '对比' }} ({{ selectedVersions.length }}/2)
-        </el-button>
-      </template>
-    </el-dialog>
+
 
     <!-- 版本对比/查看 Dialog -->
     <el-dialog
@@ -187,6 +134,53 @@
         :thesis-id="selectedThesis.id"
       />
     </el-dialog>
+
+    <!-- 批量重命名 Dialog -->
+    <el-dialog v-model="showRenameDialog" title="批量重命名" width="700px" destroy-on-close>
+      <div class="rename-info">
+        <span>论文: {{ selectedThesis?.title }}</span>
+        <span class="rename-hint">
+          格式: 姓名+学号_论文题目_日期.ext
+        </span>
+      </div>
+      <el-table
+        :data="renameVersionList"
+        v-loading="renameVersionsLoading"
+        size="small"
+        border
+        stripe
+        @selection-change="handleRenameSelectionChange"
+      >
+        <el-table-column type="selection" width="45" />
+        <el-table-column prop="versionNum" label="版本号" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag size="small">V{{ row.versionNum }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="文件名" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ formatFileName(row.filePath) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="fileSize" label="大小" width="100">
+          <template #default="{ row }">
+            {{ formatSize(row.fileSize) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="上传时间" width="170" />
+      </el-table>
+      <template #footer>
+        <el-button @click="showRenameDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="selectedRenameVersions.length === 0"
+          :loading="renaming"
+          @click="handleBatchRename"
+        >
+          重命名 ({{ selectedRenameVersions.length }})
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -198,7 +192,8 @@ import {
   getMyTheses, createThesis, forceSync,
   getVersions, uploadVersion, downloadVersion
 } from '../api/thesis'
-import { ElMessage } from 'element-plus'
+import { batchRenameFiles } from '../api/student'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 // 懒加载重量级组件
 const VersionComparer = defineAsyncComponent(() =>
@@ -215,12 +210,18 @@ const userStore = useUserStore()
 const theses = ref([])
 const loading = ref(false)
 const searchKeyword = ref(route.query.search || '')
-const filterStatus = ref('')
-const filterStudent = ref('')
-const selectedThesis = ref(null)
+
+const filterStudent = ref(route.query.student || '')
+const selectedTheses = ref([])
+const selectedThesis = computed(() => selectedTheses.value.length > 0 ? selectedTheses.value[0] : null)
 
 watch(() => route.query.search, (val) => {
   searchKeyword.value = val || ''
+})
+
+// 监听 route.query.student 变化
+watch(() => route.query.student, (val) => {
+  filterStudent.value = val || ''
 })
 
 // 学生姓名选项（去重）
@@ -234,9 +235,7 @@ const studentOptions = computed(() => {
 // 联合过滤：关键词 + 状态 + 学生
 const filteredTheses = computed(() => {
   let list = theses.value
-  if (filterStatus.value) {
-    list = list.filter(t => t.status === filterStatus.value)
-  }
+
   if (filterStudent.value) {
     list = list.filter(t => t.studentName === filterStudent.value)
   }
@@ -274,9 +273,10 @@ const loadTheses = async () => {
   }
 }
 
-// 选中当前行
-const handleCurrentChange = (row) => {
-  selectedThesis.value = row
+// 复选框选中变化
+const thesisTableRef = ref(null)
+const handleSelectionChange = (selection) => {
+  selectedTheses.value = selection
 }
 
 // ==================== 新建论文 ====================
@@ -301,7 +301,7 @@ const handleForceSync = async () => {
   try {
     const res = await forceSync()
     const data = res.data
-    ElMessage.success(`同步完成！删除 ${data.deletedVersions || 0} 个版本, ${data.deletedTheses || 0} 篇论文, 合并 ${data.mergedTheses || 0} 篇重复论文`)
+    ElMessage.success(`同步完成！删除 ${data.deletedVersions || 0} 个版本, ${data.deletedTheses || 0} 篇论文`)
     loadTheses()
   } catch (error) {
     ElMessage.error('同步失败: ' + (error.message || '未知错误'))
@@ -354,47 +354,45 @@ const openAnalysisDialog = () => {
   showAnalysisDialog.value = true
 }
 
-// ==================== 版本对比 ====================
-const showVersionSelectDialog = ref(false)
+// ==================== 论文对比 ====================
 const showCompareDialog = ref(false)
-const versionList = ref([])
-const versionsLoading = ref(false)
-const selectedVersions = ref([])
-
-const openVersionSelectDialog = async () => {
-  if (!selectedThesis.value) return
-  showVersionSelectDialog.value = true
-  versionsLoading.value = true
-  selectedVersions.value = []
-  try {
-    const res = await getVersions(selectedThesis.value.id)
-    versionList.value = res.data
-  } catch (error) {
-    console.error(error)
-    versionList.value = []
-  } finally {
-    versionsLoading.value = false
-  }
-}
-
-const handleVersionSelectionChange = (selection) => {
-  selectedVersions.value = selection
-}
-
-// 排序：新版本在前
+const compareLoading = ref(false)
 const sortedCompareVersions = ref([])
 
-const startCompare = () => {
-  if (selectedVersions.value.length === 0) return
-  const sorted = [...selectedVersions.value].sort((a, b) => {
-    if (a.createdAt !== b.createdAt) {
-      return new Date(b.createdAt) - new Date(a.createdAt)
+const handleDirectCompare = async () => {
+  if (selectedTheses.value.length === 0 || selectedTheses.value.length > 2) return
+  compareLoading.value = true
+  try {
+    // 获取每篇选中论文的最新版本
+    const versionPromises = selectedTheses.value.map(t => getVersions(t.id))
+    const results = await Promise.all(versionPromises)
+    const versions = results.map(res => {
+      const list = res.data
+      if (!list || list.length === 0) return null
+      // 取最新版本（按版本号降序，第一个即最新）
+      return list[0]
+    }).filter(Boolean)
+
+    if (versions.length === 0) {
+      ElMessage.warning('选中的论文没有可用版本')
+      return
     }
-    return b.versionNum - a.versionNum
-  })
-  sortedCompareVersions.value = sorted
-  showVersionSelectDialog.value = false
-  showCompareDialog.value = true
+
+    // 按创建时间排序，新的在前
+    const sorted = [...versions].sort((a, b) => {
+      if (a.createdAt !== b.createdAt) {
+        return new Date(b.createdAt) - new Date(a.createdAt)
+      }
+      return b.versionNum - a.versionNum
+    })
+    sortedCompareVersions.value = sorted
+    showCompareDialog.value = true
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('获取版本信息失败')
+  } finally {
+    compareLoading.value = false
+  }
 }
 
 const compareDialogTitle = computed(() => {
@@ -405,7 +403,7 @@ const compareDialogTitle = computed(() => {
   if (vers.length >= 2) {
     return `对比: ${formatFileName(vers[0].filePath) || '新版本'} ↔ ${formatFileName(vers[1].filePath) || '旧版本'}`
   }
-  return '版本对比'
+  return '论文对比'
 })
 
 // ==================== 工具函数 ====================
@@ -426,14 +424,62 @@ const formatSize = (bytes) => {
   return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]
 }
 
-const getStatusType = (status) => {
-  const map = { DRAFT: 'info', SUBMITTED: 'warning', REVIEWED: 'success', APPROVED: 'success' }
-  return map[status] || 'info'
+
+// ==================== 批量重命名 ====================
+const showRenameDialog = ref(false)
+const renameVersionList = ref([])
+const renameVersionsLoading = ref(false)
+const selectedRenameVersions = ref([])
+const renaming = ref(false)
+
+const openRenameDialog = async () => {
+  if (!selectedThesis.value) return
+  showRenameDialog.value = true
+  renameVersionsLoading.value = true
+  selectedRenameVersions.value = []
+  try {
+    const res = await getVersions(selectedThesis.value.id)
+    renameVersionList.value = res.data
+  } catch (error) {
+    console.error(error)
+    renameVersionList.value = []
+  } finally {
+    renameVersionsLoading.value = false
+  }
 }
 
-const getStatusText = (status) => {
-  const map = { DRAFT: '草稿', SUBMITTED: '已提交', REVIEWED: '已批改', APPROVED: '已通过' }
-  return map[status] || status
+const handleRenameSelectionChange = (selection) => {
+  selectedRenameVersions.value = selection
+}
+
+const handleBatchRename = async () => {
+  if (!selectedThesis.value) return
+  const thesis = selectedThesis.value
+  try {
+    await ElMessageBox.confirm(
+      `将选中的 ${selectedRenameVersions.value.length} 个文件重命名为规范格式？`,
+      '批量重命名确认',
+      { type: 'info', confirmButtonText: '确定重命名', cancelButtonText: '取消' }
+    )
+    renaming.value = true
+    const res = await batchRenameFiles({
+      studentId: thesis.studentId,
+      versionIds: selectedRenameVersions.value.map(v => v.id)
+    })
+    const data = res.data
+    ElMessage.success(`重命名完成: 成功 ${data.success} 个, 失败 ${data.failed} 个`)
+    if (data.errors && data.errors.length > 0) {
+      console.warn('重命名错误:', data.errors)
+    }
+    // 刷新版本列表
+    const refreshRes = await getVersions(thesis.id)
+    renameVersionList.value = refreshRes.data
+    loadTheses()
+  } catch (error) {
+    if (error !== 'cancel') console.error(error)
+  } finally {
+    renaming.value = false
+  }
 }
 
 onMounted(() => {
@@ -478,5 +524,24 @@ onMounted(() => {
 
 :deep(.el-table__body tr.current-row > td) {
   background-color: #ecf5ff !important;
+}
+
+.rename-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #f0f5ff;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #303133;
+}
+
+.rename-hint {
+  font-size: 12px;
+  color: #909399;
+  font-family: monospace;
 }
 </style>

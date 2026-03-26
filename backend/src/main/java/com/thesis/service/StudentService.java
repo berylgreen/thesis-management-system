@@ -122,16 +122,17 @@ public class StudentService {
         com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.thesis.entity.Thesis> tw =
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
         tw.eq(com.thesis.entity.Thesis::getStudentId, studentId)
-          .orderByDesc(com.thesis.entity.Thesis::getUpdatedAt);
+          .orderByAsc(com.thesis.entity.Thesis::getCreatedAt);
         java.util.List<com.thesis.entity.Thesis> theses = thesisMapper.selectList(tw);
 
         java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        int versionCounter = 0;
         for (com.thesis.entity.Thesis thesis : theses) {
+            versionCounter++;
             java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
             item.put("id", thesis.getId());
             item.put("title", thesis.getTitle());
-            item.put("status", thesis.getStatus());
-            item.put("currentVersion", thesis.getCurrentVersion());
+            item.put("currentVersion", versionCounter);
             item.put("createdAt", thesis.getCreatedAt());
 
             // 查询该论文所有版本

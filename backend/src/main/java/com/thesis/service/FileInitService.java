@@ -234,22 +234,13 @@ public class FileInitService implements CommandLineRunner {
             return false;
         }
 
-        // 查找或创建论文记录
-        LambdaQueryWrapper<Thesis> thesisWrapper = new LambdaQueryWrapper<>();
-        thesisWrapper.eq(Thesis::getStudentId, student.getId())
-                     .eq(Thesis::getTitle, title);
-        Thesis thesis = thesisMapper.selectOne(thesisWrapper);
-
-        if (thesis == null) {
-            // 创建新论文
-            thesis = new Thesis();
-            thesis.setStudentId(student.getId());
-            thesis.setTitle(title);
-            thesis.setStatus("SUBMITTED");
-            thesis.setCurrentVersion(0);
-            thesisMapper.insert(thesis);
-            log.info("创建新论文: {} (学生: {})", title, student.getUsername());
-        }
+        // 每个文件创建独立的论文记录（不按标题合并）
+        Thesis thesis = new Thesis();
+        thesis.setStudentId(student.getId());
+        thesis.setTitle(title);
+        thesis.setCurrentVersion(0);
+        thesisMapper.insert(thesis);
+        log.info("创建新论文: {} (学生: {})", title, student.getUsername());
 
         // 创建新版本
         int newVersionNum = thesis.getCurrentVersion() + 1;
@@ -264,7 +255,6 @@ public class FileInitService implements CommandLineRunner {
 
         // 更新论文版本号
         thesis.setCurrentVersion(newVersionNum);
-        thesis.setStatus("SUBMITTED");
         thesisMapper.updateById(thesis);
 
         log.info("导入文件成功: {} -> 论文ID: {}, 版本: {}", fileName, thesis.getId(), newVersionNum);
@@ -361,8 +351,8 @@ public class FileInitService implements CommandLineRunner {
         
         log.info("清理完成: 删除 {} 个版本记录, {} 篇空论文", deletedVersions, deletedTheses);
 
-        // 2.5 合并同学生同标题的重复论文
-        int mergedTheses = mergeDuplicateTheses();
+        // 不再合并同标题论文，每个文件独立显示
+        int mergedTheses = 0;
 
         // 3. 调用现有扫描逻辑添加新文件
         scanAndInitialize();
@@ -376,94 +366,7 @@ public class FileInitService implements CommandLineRunner {
         return result;
     }
 
-    /**
-     * 合并同一学生、同一标题的重复论文记录
-     * 保留每组中最早创建的记录，将其他记录的版本迁移过来并重排版本号
-     * @return 被合并删除的论文数量
-     */
-    private int mergeDuplicateTheses() {
-        List<Thesis> allTheses = thesisMapper.selectList(null);
-        if (allTheses == null || allTheses.isEmpty()) {
-            return 0;
-        }
 
-        // 按 (studentId, title) 分组
-        java.util.Map<String, java.util.List<Thesis>> groups = new java.util.LinkedHashMap<>();
-        for (Thesis t : allTheses) {
-            String key = t.getStudentId() + "::" + t.getTitle();
-            groups.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(t);
-        }
-
-        int merged = 0;
-        for (java.util.Map.Entry<String, java.util.List<Thesis>> entry : groups.entrySet()) {
-            java.util.List<Thesis> group = entry.getValue();
-            if (group.size() <= 1) {
-                continue;
-            }
-
-            // 按 ID 排序，保留最小 ID（最早创建）的记录
-            group.sort((a, b) -> Long.compare(a.getId(), b.getId()));
-            Thesis primary = group.get(0);
-
-            log.info("合并重复论文: 标题='{}', 保留ID={}, 合并 {} 条",
-                    primary.getTitle(), primary.getId(), group.size() - 1);
-
-            // 将其他论文的版本迁移到 primary（使用临时高版本号避免唯一约束冲突）
-            int tempVersionBase = 10000;
-            for (int i = 1; i < group.size(); i++) {
-                Thesis duplicate = group.get(i);
-                LambdaQueryWrapper<ThesisVersion> vw = new LambdaQueryWrapper<>();
-                vw.eq(ThesisVersion::getThesisId, duplicate.getId());
-                List<ThesisVersion> versions = thesisVersionMapper.selectList(vw);
-
-                for (ThesisVersion v : versions) {
-                    v.setThesisId(primary.getId());
-                    v.setVersionNum(tempVersionBase++); // 临时版本号，renumberVersions 会重排
-                    thesisVersionMapper.updateById(v);
-                }
-
-                // 删除重复的论文记录
-                thesisMapper.deleteById(duplicate.getId());
-                merged++;
-            }
-
-            // 重排 primary 的版本号（按文件创建时间排序）
-            renumberVersions(primary);
-        }
-
-        if (merged > 0) {
-            log.info("论文合并完成: 合并删除 {} 篇重复论文", merged);
-        }
-        return merged;
-    }
-
-    /**
-     * 按创建时间重排论文的版本号
-     */
-    private void renumberVersions(Thesis thesis) {
-        LambdaQueryWrapper<ThesisVersion> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(ThesisVersion::getThesisId, thesis.getId())
-               .orderByAsc(ThesisVersion::getCreatedAt);
-        List<ThesisVersion> versions = thesisVersionMapper.selectList(wrapper);
-
-        // 第一遍：全部设置为临时高版本号，清除唯一约束冲突空间
-        for (int i = 0; i < versions.size(); i++) {
-            ThesisVersion v = versions.get(i);
-            v.setVersionNum(20000 + i);
-            thesisVersionMapper.updateById(v);
-        }
-
-        // 第二遍：从 1 开始重排
-        for (int i = 0; i < versions.size(); i++) {
-            ThesisVersion v = versions.get(i);
-            v.setVersionNum(i + 1);
-            thesisVersionMapper.updateById(v);
-        }
-
-        // 更新论文的当前版本号
-        thesis.setCurrentVersion(versions.size());
-        thesisMapper.updateById(thesis);
-    }
 
     /**
      * 从文件路径中提取论文标题（复用 FILE_PATTERN 正则）

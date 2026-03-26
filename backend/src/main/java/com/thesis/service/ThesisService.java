@@ -26,7 +26,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -52,7 +55,6 @@ public class ThesisService {
         Thesis thesis = new Thesis();
         thesis.setStudentId(studentId);
         thesis.setTitle(title);
-        thesis.setStatus("DRAFT");
         thesis.setCurrentVersion(0);
         thesisMapper.insert(thesis);
         return thesis;
@@ -87,7 +89,6 @@ public class ThesisService {
         thesisVersionMapper.insert(version);
 
         thesis.setCurrentVersion(newVersionNum);
-        thesis.setStatus("SUBMITTED");
         thesisMapper.updateById(thesis);
 
         return version;
@@ -95,8 +96,22 @@ public class ThesisService {
 
     public List<Thesis> getStudentTheses(Long studentId) {
         LambdaQueryWrapper<Thesis> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Thesis::getStudentId, studentId);
-        return thesisMapper.selectList(wrapper);
+        wrapper.eq(Thesis::getStudentId, studentId)
+               .orderByAsc(Thesis::getCreatedAt);
+        List<Thesis> theses = thesisMapper.selectList(wrapper);
+
+        // 按创建时间升序分配版本号 1, 2, 3...
+        int versionCounter = 0;
+        for (Thesis t : theses) {
+            versionCounter++;
+            t.setCurrentVersion(versionCounter);
+        }
+
+        // 返回时按更新时间倒序（最新在前）
+        theses.sort(Comparator.comparing(
+                Thesis::getUpdatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return theses;
     }
 
     public List<Thesis> getAllTheses() {
@@ -107,9 +122,27 @@ public class ThesisService {
 
     public List<ThesisDTO> getAllThesesWithStudent() {
         List<Thesis> theses = getAllTheses();
+
+        // 按 studentId 分组，每组内按 createdAt 升序排列，计算学生内的版本序号
+        Map<Long, Integer> studentVersionCounter = new HashMap<>();
+        // 先按 createdAt 升序排列以便分配版本号
+        List<Thesis> sortedByTime = theses.stream()
+                .sorted(Comparator.comparing(
+                        Thesis::getCreatedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.toList());
+        Map<Long, Integer> thesisVersionMap = new HashMap<>();
+        for (Thesis t : sortedByTime) {
+            int ver = studentVersionCounter.getOrDefault(t.getStudentId(), 0) + 1;
+            studentVersionCounter.put(t.getStudentId(), ver);
+            thesisVersionMap.put(t.getId(), ver);
+        }
+
         return theses.stream().map(thesis -> {
             ThesisDTO dto = new ThesisDTO();
             BeanUtils.copyProperties(thesis, dto);
+            // 设置学生内的时间顺序版本号
+            dto.setCurrentVersion(thesisVersionMap.getOrDefault(thesis.getId(), thesis.getCurrentVersion()));
 
             User student = userMapper.selectById(thesis.getStudentId());
             if (student != null) {
@@ -167,26 +200,21 @@ public class ThesisService {
             throw new NotFoundException("版本不存在");
         }
 
-        // 3. 跨论文校验
-        if (!v1.getThesisId().equals(v2.getThesisId())) {
-            throw new BadRequestException("不能对比不同论文的版本");
-        }
-
-        // 4. 加载论文
-        Thesis thesis = thesisMapper.selectById(v1.getThesisId());
-        if (thesis == null) {
+        // 3. 加载论文并校验权限
+        Thesis thesis1 = thesisMapper.selectById(v1.getThesisId());
+        Thesis thesis2 = thesisMapper.selectById(v2.getThesisId());
+        if (thesis1 == null || thesis2 == null) {
             throw new NotFoundException("论文不存在");
         }
 
-        // 5. 权限校验（仅允许STUDENT和TEACHER角色）
+        // 4. 权限校验（仅允许STUDENT和TEACHER角色）
         if ("STUDENT".equals(role)) {
-            if (!thesis.getStudentId().equals(currentUserId)) {
+            if (!thesis1.getStudentId().equals(currentUserId) || !thesis2.getStudentId().equals(currentUserId)) {
                 throw new ForbiddenException("无权访问他人论文");
             }
         } else if ("TEACHER".equals(role)) {
             // 教师可以访问所有论文
         } else {
-            // 其他角色一律拒绝
             throw new ForbiddenException("角色无权限执行此操作");
         }
 
