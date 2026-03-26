@@ -23,6 +23,9 @@ public class StudentService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private FileInitService fileInitService;
+
     /**
      * 分页查询学生列表，支持按学号/姓名模糊搜索
      */
@@ -271,6 +274,14 @@ public class StudentService {
             } else {
                 skippedStudents++;
             }
+        }
+
+        // 3. 文件重命名后执行强制同步，确保数据库与文件系统完全一致
+        //    （合并重复论文记录、清理旧路径、从新文件名提取标题）
+        try {
+            fileInitService.forceSyncFromFileSystem();
+        } catch (Exception e) {
+            errors.add("强制同步异常: " + e.getMessage());
         }
 
         java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
