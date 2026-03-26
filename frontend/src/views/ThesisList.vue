@@ -152,11 +152,6 @@
         @selection-change="handleRenameSelectionChange"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column prop="versionNum" label="版本号" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag size="small">V{{ row.versionNum }}</el-tag>
-          </template>
-        </el-table-column>
         <el-table-column label="文件名" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             {{ formatFileName(row.filePath) }}
