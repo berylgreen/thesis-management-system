@@ -8,4 +8,5 @@ public class ThesisDTO extends Thesis {
     private String studentName;  // 学生姓名
     private String studentUsername;  // 学号
     private String fileDate;  // 从文件名提取的日期（如 20260326）
+    private Integer currentVersion;  // 学生内的时间顺序版本号（动态计算）
 }

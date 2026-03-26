@@ -139,7 +139,7 @@ public class StudentService {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.thesis.entity.ThesisVersion> vw =
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             vw.eq(com.thesis.entity.ThesisVersion::getThesisId, thesis.getId())
-              .orderByDesc(com.thesis.entity.ThesisVersion::getVersionNum);
+              .orderByDesc(com.thesis.entity.ThesisVersion::getCreatedAt);
             java.util.List<com.thesis.entity.ThesisVersion> versions = thesisVersionMapper.selectList(vw);
 
             // 构建版本信息（包含文件名）
@@ -147,7 +147,6 @@ public class StudentService {
             for (com.thesis.entity.ThesisVersion v : versions) {
                 java.util.Map<String, Object> vi = new java.util.LinkedHashMap<>();
                 vi.put("id", v.getId());
-                vi.put("versionNum", v.getVersionNum());
                 vi.put("fileName", extractFileName(v.getFilePath()));
                 vi.put("filePath", v.getFilePath());
                 vi.put("fileSize", v.getFileSize());

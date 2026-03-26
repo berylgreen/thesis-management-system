@@ -13,9 +13,6 @@ public class ThesisAnalysisResult {
     /** 分析的论文版本ID */
     private Long versionId;
 
-    /** 分析的论文版本号 */
-    private Integer versionNum;
-
     // ==================== 摘要分析 ====================
 
     /** 提取的摘要原文 */

@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS t_thesis (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     student_id BIGINT NOT NULL,
     title VARCHAR(200) NOT NULL,
-    current_version INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted TINYINT DEFAULT 0,
@@ -34,14 +33,12 @@ CREATE INDEX IF NOT EXISTS idx_thesis_student_id ON t_thesis(student_id);
 CREATE TABLE IF NOT EXISTS t_thesis_version (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     thesis_id BIGINT NOT NULL,
-    version_num INT NOT NULL,
     file_path VARCHAR(500) NOT NULL,
     content_hash VARCHAR(64),
     file_size BIGINT,
     remark VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted TINYINT DEFAULT 0,
-    CONSTRAINT uk_thesis_version UNIQUE (thesis_id, version_num),
     FOREIGN KEY (thesis_id) REFERENCES t_thesis(id)
 );
 CREATE INDEX IF NOT EXISTS idx_version_thesis_id ON t_thesis_version(thesis_id);

@@ -14,8 +14,6 @@ public class Thesis {
 
     private String title;
 
-    private Integer currentVersion;
-
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

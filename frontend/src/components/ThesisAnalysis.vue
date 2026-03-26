@@ -4,7 +4,7 @@
     <div v-if="result" class="analysis-header">
       <el-alert type="success" :closable="false" show-icon>
         <template #title>
-          分析完成 — 版本 V{{ result.versionNum }}
+          分析完成
         </template>
       </el-alert>
     </div>

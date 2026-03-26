@@ -97,7 +97,6 @@ public class ThesisAnalysisService {
     private ThesisAnalysisResult executeAnalysis(String filePath, ThesisVersion version) {
         ThesisAnalysisResult result = new ThesisAnalysisResult();
         result.setVersionId(version.getId());
-        result.setVersionNum(version.getVersionNum());
 
         try {
             // --- 摘要分析 ---
@@ -142,7 +141,7 @@ public class ThesisAnalysisService {
     private ThesisVersion getLatestVersion(Long thesisId) {
         LambdaQueryWrapper<ThesisVersion> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ThesisVersion::getThesisId, thesisId)
-                .orderByDesc(ThesisVersion::getVersionNum)
+                .orderByDesc(ThesisVersion::getCreatedAt)
                 .last("LIMIT 1");
         return thesisVersionMapper.selectOne(wrapper);
     }

@@ -238,26 +238,19 @@ public class FileInitService implements CommandLineRunner {
         Thesis thesis = new Thesis();
         thesis.setStudentId(student.getId());
         thesis.setTitle(title);
-        thesis.setCurrentVersion(0);
         thesisMapper.insert(thesis);
         log.info("创建新论文: {} (学生: {})", title, student.getUsername());
 
-        // 创建新版本
-        int newVersionNum = thesis.getCurrentVersion() + 1;
+        // 创建版本记录
         ThesisVersion version = new ThesisVersion();
         version.setThesisId(thesis.getId());
-        version.setVersionNum(newVersionNum);
         version.setFilePath(file.getAbsolutePath());
         version.setContentHash(contentHash);
         version.setFileSize(file.length());
         version.setRemark("系统自动导入" + (dateStr != null ? " (文件日期: " + dateStr + ")" : ""));
         thesisVersionMapper.insert(version);
 
-        // 更新论文版本号
-        thesis.setCurrentVersion(newVersionNum);
-        thesisMapper.updateById(thesis);
-
-        log.info("导入文件成功: {} -> 论文ID: {}, 版本: {}", fileName, thesis.getId(), newVersionNum);
+        log.info("导入文件成功: {} -> 论文ID: {}", fileName, thesis.getId());
         return true;
     }
 
@@ -323,17 +316,11 @@ public class FileInitService implements CommandLineRunner {
                 thesisMapper.deleteById(thesis.getId());
                 deletedTheses++;
             } else {
-                // 更新当前版本号为实际最大版本
-                wrapper.orderByDesc(ThesisVersion::getVersionNum);
+                // 从最新版本文件名提取标题，同步更新论文标题
+                wrapper.orderByDesc(ThesisVersion::getCreatedAt);
                 ThesisVersion latestVersion = thesisVersionMapper.selectOne(wrapper.last("LIMIT 1"));
                 boolean needUpdate = false;
 
-                if (latestVersion != null && !latestVersion.getVersionNum().equals(thesis.getCurrentVersion())) {
-                    thesis.setCurrentVersion(latestVersion.getVersionNum());
-                    needUpdate = true;
-                }
-
-                // 从最新版本文件名提取标题，同步更新论文标题
                 if (latestVersion != null) {
                     String newTitle = extractTitleFromFilePath(latestVersion.getFilePath());
                     if (newTitle != null && !newTitle.equals(thesis.getTitle())) {

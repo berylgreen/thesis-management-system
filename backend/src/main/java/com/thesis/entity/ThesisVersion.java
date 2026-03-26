@@ -12,8 +12,6 @@ public class ThesisVersion {
 
     private Long thesisId;
 
-    private Integer versionNum;
-
     private String filePath;
 
     private String contentHash;

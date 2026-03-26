@@ -60,7 +60,6 @@ public class ThesisService {
         Thesis thesis = new Thesis();
         thesis.setStudentId(studentId);
         thesis.setTitle(title);
-        thesis.setCurrentVersion(0);
         thesisMapper.insert(thesis);
         return thesis;
     }
@@ -83,18 +82,13 @@ public class ThesisService {
 
         String contentHash = calculateHash(file.getBytes());
 
-        int newVersionNum = thesis.getCurrentVersion() + 1;
         ThesisVersion version = new ThesisVersion();
         version.setThesisId(thesisId);
-        version.setVersionNum(newVersionNum);
         version.setFilePath(filePath.toString());
         version.setContentHash(contentHash);
         version.setFileSize(file.getSize());
         version.setRemark(remark);
         thesisVersionMapper.insert(version);
-
-        thesis.setCurrentVersion(newVersionNum);
-        thesisMapper.updateById(thesis);
 
         return version;
     }
@@ -152,7 +146,7 @@ public class ThesisService {
             ThesisDTO dto = new ThesisDTO();
             BeanUtils.copyProperties(thesis, dto);
             // 设置学生内的时间顺序版本号
-            dto.setCurrentVersion(thesisVersionMap.getOrDefault(thesis.getId(), thesis.getCurrentVersion()));
+            dto.setCurrentVersion(thesisVersionMap.getOrDefault(thesis.getId(), 1));
             // 从文件名提取日期
             dto.setFileDate(extractFileDateForThesis(thesis.getId()));
 
@@ -168,8 +162,7 @@ public class ThesisService {
     public List<ThesisVersion> getThesisVersions(Long thesisId) {
         LambdaQueryWrapper<ThesisVersion> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ThesisVersion::getThesisId, thesisId)
-               .orderByDesc(ThesisVersion::getCreatedAt)
-               .orderByDesc(ThesisVersion::getVersionNum);
+               .orderByDesc(ThesisVersion::getCreatedAt);
         return thesisVersionMapper.selectList(wrapper);
     }
 
@@ -330,7 +323,7 @@ public class ThesisService {
     private String extractFileDateForThesis(Long thesisId) {
         LambdaQueryWrapper<ThesisVersion> vw = new LambdaQueryWrapper<>();
         vw.eq(ThesisVersion::getThesisId, thesisId)
-          .orderByDesc(ThesisVersion::getVersionNum)
+          .orderByDesc(ThesisVersion::getCreatedAt)
           .last("LIMIT 1");
         ThesisVersion version = thesisVersionMapper.selectOne(vw);
         if (version == null || version.getFilePath() == null) {

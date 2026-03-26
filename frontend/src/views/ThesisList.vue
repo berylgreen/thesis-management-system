@@ -375,10 +375,7 @@ const handleDirectCompare = async () => {
 
     // 按创建时间排序，新的在前
     const sorted = [...versions].sort((a, b) => {
-      if (a.createdAt !== b.createdAt) {
-        return new Date(b.createdAt) - new Date(a.createdAt)
-      }
-      return b.versionNum - a.versionNum
+      return new Date(b.createdAt) - new Date(a.createdAt)
     })
     sortedCompareVersions.value = sorted
     showCompareDialog.value = true
