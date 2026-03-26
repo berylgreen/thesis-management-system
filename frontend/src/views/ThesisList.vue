@@ -55,6 +55,7 @@
         style="width: 100%"
         v-loading="loading"
         @selection-change="handleSelectionChange"
+        @row-click="handleRowClick"
         row-class-name="clickable-row"
       >
         <el-table-column type="selection" width="45" />
@@ -272,6 +273,11 @@ const loadTheses = async () => {
 const thesisTableRef = ref(null)
 const handleSelectionChange = (selection) => {
   selectedTheses.value = selection
+}
+
+// 点击行任意位置切换选中
+const handleRowClick = (row) => {
+  thesisTableRef.value.toggleRowSelection(row)
 }
 
 // ==================== 新建论文 ====================
