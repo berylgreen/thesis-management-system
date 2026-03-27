@@ -55,13 +55,31 @@
       <!-- ==================== 目录分析 ==================== -->
       <el-tab-pane label="目录分析" name="toc">
         <div class="section" v-if="result.chapters && result.chapters.length > 0">
-          <h4 class="section-title">章节结构</h4>
-          <el-table :data="result.chapters" border stripe size="small" class="chapter-table">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h4 class="section-title" style="margin-bottom: 0;">章节结构</h4>
+            <div>
+              <span style="font-size: 13px; color: #606266; margin-right: 8px;">显示层级:</span>
+              <el-select v-model="tocMaxLevel" size="small" style="width: 120px;">
+                <el-option label="全部显示" :value="0" />
+                <el-option label="仅限一级" :value="1" />
+                <el-option label="显示至二级" :value="2" />
+                <el-option label="显示至三级" :value="3" />
+              </el-select>
+            </div>
+          </div>
+          <el-table
+            :data="chapterTree"
+            row-key="id"
+            default-expand-all
+            :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+            border
+            stripe
+            size="small"
+            class="chapter-table"
+          >
             <el-table-column label="章节标题" min-width="300">
               <template #default="{ row }">
-                <span :style="{ paddingLeft: (row.level - 1) * 24 + 'px' }">
-                  {{ row.title }}
-                </span>
+                <span>{{ row.title }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="level" label="级别" width="80" align="center">
@@ -71,9 +89,9 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="段落数" width="100" align="center">
+            <el-table-column label="页数" width="100" align="center">
               <template #default="{ row }">
-                {{ row.level === 1 ? row.paragraphCount : '-' }}
+                {{ row.level === 1 ? row.pageCount : '-' }}
               </template>
             </el-table-column>
             <el-table-column label="占比" width="200">
@@ -267,6 +285,7 @@ const loading = ref(false)
 const result = ref(null)
 const error = ref(null)
 const activeTab = ref('abstract')
+const tocMaxLevel = ref(1) // 默认显示一级目录
 
 const typeLabels = {
   FIGURE: '图',
@@ -297,6 +316,47 @@ const verifiedCount = computed(() =>
 const unverifiedCount = computed(() =>
   result.value?.references?.filter(r => !r.verified).length || 0
 )
+
+// 将平铺的章节列表转换为树形结构供 el-table 折叠显示
+const chapterTree = computed(() => {
+  const chapters = result.value?.chapters
+  if (!chapters || chapters.length === 0) return []
+
+  // 根据用户选择的目录层级进行过滤
+  const filteredChapters = tocMaxLevel.value === 0 
+    ? chapters 
+    : chapters.filter(ch => ch.level <= tocMaxLevel.value)
+
+  const tree = []
+  const stack = []
+  let idCounter = 1
+
+  filteredChapters.forEach(ch => {
+    const node = { ...ch, id: idCounter++, children: [] }
+    
+    // 如果当前节点是1级节点，直接加入根数组，并清空非同级栈
+    if (node.level === 1) {
+      tree.push(node)
+      stack.length = 0
+      stack.push(node)
+    } else {
+      // 找到父节点 (栈中最后一个级别小于当前级别的节点)
+      while (stack.length > 0 && stack[stack.length - 1].level >= node.level) {
+        stack.pop()
+      }
+      
+      if (stack.length > 0) {
+        stack[stack.length - 1].children.push(node)
+      } else {
+        // 异常情况容错处理：没有父节点，直接当根节点
+        tree.push(node)
+      }
+      stack.push(node)
+    }
+  })
+  
+  return tree
+})
 
 // 占比颜色
 const getProportionColor = (proportion) => {

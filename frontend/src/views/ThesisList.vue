@@ -23,6 +23,10 @@
             </el-select>
 
 
+            <el-checkbox v-if="isTeacher" v-model="onlyShowLatest" style="margin-right: 15px;">
+              仅显示学生最新论文
+            </el-checkbox>
+
             <!-- 功能按钮 -->
             <el-button type="primary" @click="openUploadDialog" :disabled="!selectedThesis">
               上传新版本
@@ -170,6 +174,7 @@ const searchKeyword = ref(route.query.search || '')
 const filterStudent = ref(route.query.student || '')
 const selectedTheses = ref([])
 const selectedThesis = computed(() => selectedTheses.value.length > 0 ? selectedTheses.value[0] : null)
+const onlyShowLatest = ref(true)
 
 watch(() => route.query.search, (val) => {
   searchKeyword.value = val || ''
@@ -188,9 +193,38 @@ const studentOptions = computed(() => {
   return [...new Set(names)].sort()
 })
 
-// 联合过滤：关键词 + 状态 + 学生
+const isTeacher = computed(() => {
+  return userStore.role === 'TEACHER' || userStore.role === 'ADMIN'
+})
+
+// 联合过滤：关键词 + 状态 + 学生 + 仅显示最新
 const filteredTheses = computed(() => {
   let list = theses.value
+
+  // 先按仅显示最新过滤
+  if (isTeacher.value && onlyShowLatest.value) {
+    const latestMap = new Map()
+    list.forEach(t => {
+      const studentId = t.studentUsername || t.studentName
+      if (!studentId) {
+        latestMap.set(`NO_STUDENT_${t.id}`, t)
+        return
+      }
+      const existing = latestMap.get(studentId)
+      if (!existing) {
+        latestMap.set(studentId, t)
+      } else {
+        const date1 = t.fileDate || ''
+        const date2 = existing.fileDate || ''
+        if (date1 > date2) {
+          latestMap.set(studentId, t)
+        } else if (date1 === date2 && t.id > existing.id) {
+          latestMap.set(studentId, t)
+        }
+      }
+    })
+    list = Array.from(latestMap.values())
+  }
 
   if (filterStudent.value) {
     list = list.filter(t => t.studentName === filterStudent.value)
@@ -204,10 +238,6 @@ const filteredTheses = computed(() => {
     )
   }
   return list
-})
-
-const isTeacher = computed(() => {
-  return userStore.role === 'TEACHER' || userStore.role === 'ADMIN'
 })
 
 const pageTitle = computed(() => {

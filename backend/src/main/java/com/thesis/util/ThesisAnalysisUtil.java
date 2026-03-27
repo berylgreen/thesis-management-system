@@ -198,14 +198,25 @@ public class ThesisAnalysisUtil {
 
     /**
      * 提取目录结构
-     * 双重策略：优先读取 Heading 样式，回退到正则匹配
+     * 三重策略：优先读取 Heading 样式，回退到目录区域解析，最后正则匹配
      */
     public List<ChapterInfo> extractTableOfContents(String filePath) throws IOException {
         // 策略1：基于 Word Heading 样式
         List<ChapterInfo> chapters = extractByHeadingStyle(filePath);
 
-        // 策略2：回退到正则匹配
-        if (chapters.isEmpty()) {
+        // 策略2：从文档的"目录"区域解析（适用于自定义样式的文档）
+        // 当 Heading 提取无一级标题时触发
+        boolean hasL1 = chapters.stream().anyMatch(c -> c.getLevel() == 1);
+        if (!hasL1) {
+            List<ChapterInfo> tocChapters = extractFromTocSection(filePath);
+            if (!tocChapters.isEmpty()) {
+                chapters = tocChapters;
+            }
+        }
+
+        // 策略3：回退到正则匹配
+        hasL1 = chapters.stream().anyMatch(c -> c.getLevel() == 1);
+        if (!hasL1) {
             chapters = extractByRegex(filePath);
         }
 
@@ -225,21 +236,20 @@ public class ThesisAnalysisUtil {
             return analysis;
         }
 
-        // 统计段落数
-        List<String> paragraphs = readAllParagraphTexts(filePath);
-        assignParagraphCounts(chapters, paragraphs);
+        // 统计页数
+        assignPageCounts(chapters, filePath);
 
-        int totalParagraphs = chapters.stream()
+        int totalPages = chapters.stream()
                 .filter(c -> c.getLevel() == 1)
-                .mapToInt(ChapterInfo::getParagraphCount)
+                .mapToInt(ChapterInfo::getPageCount)
                 .sum();
 
-        if (totalParagraphs == 0) totalParagraphs = 1; // 防止除零
+        if (totalPages == 0) totalPages = 1; // 防止除零
 
         // 计算占比
         for (ChapterInfo ch : chapters) {
             if (ch.getLevel() == 1) {
-                ch.setProportion(Math.round(ch.getParagraphCount() * 10000.0 / totalParagraphs) / 100.0);
+                ch.setProportion(Math.round(ch.getPageCount() * 10000.0 / totalPages) / 100.0);
             }
         }
 
@@ -559,35 +569,196 @@ public class ThesisAnalysisUtil {
     }
 
     /**
-     * 为一级章节分配段落数
-     * 统计两个一级标题之间的段落数量
+     * 从文档的"目录"区域提取章节结构（策略2）。
+     * 适用于未使用标准 Heading 样式但有目录页的论文。
+     * 解析目录条目的标题和级别，去掉末尾页码。
      */
-    private void assignParagraphCounts(List<ChapterInfo> chapters, List<String> paragraphs) {
-        // 获取所有一级章节的标题
+    private List<ChapterInfo> extractFromTocSection(String filePath) throws IOException {
+        List<ChapterInfo> chapters = new ArrayList<>();
+
+        try (FileInputStream fis = new FileInputStream(filePath);
+             XWPFDocument doc = new XWPFDocument(fis)) {
+
+            boolean inToc = false;
+
+            for (XWPFParagraph para : doc.getParagraphs()) {
+                String text = para.getText();
+                if (text == null || text.trim().isEmpty()) continue;
+                String trimmed = text.trim();
+
+                if (!inToc) {
+                    if (TOC_START.matcher(trimmed).matches()) {
+                        inToc = true;
+                    }
+                    continue;
+                }
+
+                // 目录结束判定：遇到不含末尾页码且匹配章节标题正则的段落（正文标题）
+                if (!TOC_PAGE_NUMBER.matcher(trimmed).find()) {
+                    if (CHAPTER_L1.matcher(trimmed).matches()) {
+                        break;
+                    }
+                    continue;
+                }
+
+                // 提取末尾页码并去掉
+                Matcher pm = TOC_PAGE_NUMBER.matcher(trimmed);
+                if (!pm.find()) continue;
+
+                String titlePart = trimmed.substring(0, pm.start()).trim();
+                titlePart = titlePart.replaceAll("[\\t.·…]+$", "").trim();
+                if (titlePart.isEmpty()) continue;
+
+                // 判断级别
+                int level = -1;
+                if (CHAPTER_L3.matcher(titlePart).matches()) {
+                    level = 3;
+                } else if (CHAPTER_L2.matcher(titlePart).matches()) {
+                    level = 2;
+                } else if (CHAPTER_L1.matcher(titlePart).matches()) {
+                    level = 1;
+                }
+
+                if (level > 0) {
+                    ChapterInfo ch = new ChapterInfo();
+                    ch.setTitle(titlePart);
+                    ch.setLevel(level);
+                    chapters.add(ch);
+                }
+            }
+        }
+        return chapters;
+    }
+
+    /**
+     * 为一级章节分配页数
+     * 从文档的"目录"区域提取每个一级标题对应的页码，
+     * 计算两个一级标题之间跨越的页数。
+     */
+    private void assignPageCounts(List<ChapterInfo> chapters, String filePath) throws IOException {
         List<ChapterInfo> l1Chapters = chapters.stream()
                 .filter(c -> c.getLevel() == 1)
                 .collect(Collectors.toList());
 
         if (l1Chapters.isEmpty()) return;
 
-        // 在段落列表中定位每个一级标题
-        List<Integer> positions = new ArrayList<>();
-        for (ChapterInfo ch : l1Chapters) {
-            for (int i = 0; i < paragraphs.size(); i++) {
-                if (paragraphs.get(i).trim().equals(ch.getTitle()) ||
-                    paragraphs.get(i).trim().contains(ch.getTitle())) {
-                    positions.add(i);
-                    break;
+        // 从目录区域提取一级标题及其页码
+        Map<String, Integer> tocPageNumbers = extractTocPageNumbers(filePath);
+
+        if (!tocPageNumbers.isEmpty()) {
+            // 匹配章节标题到目录页码
+            List<Integer> pageNumbers = new ArrayList<>();
+            for (ChapterInfo ch : l1Chapters) {
+                Integer pageNum = findMatchingPageNumber(ch.getTitle(), tocPageNumbers);
+                pageNumbers.add(pageNum != null ? pageNum : 0);
+            }
+
+            // 计算每章页数 = 下一章起始页 - 本章起始页
+            for (int i = 0; i < l1Chapters.size(); i++) {
+                int startPage = pageNumbers.get(i);
+                if (startPage == 0) {
+                    l1Chapters.get(i).setPageCount(1);
+                    continue;
+                }
+                int endPage = 0;
+                for (int j = i + 1; j < pageNumbers.size(); j++) {
+                    if (pageNumbers.get(j) > 0) {
+                        endPage = pageNumbers.get(j);
+                        break;
+                    }
+                }
+                if (endPage > startPage) {
+                    l1Chapters.get(i).setPageCount(endPage - startPage);
+                } else {
+                    l1Chapters.get(i).setPageCount(1);
+                }
+            }
+        } else {
+            for (ChapterInfo ch : l1Chapters) {
+                ch.setPageCount(1);
+            }
+        }
+    }
+
+    /** 目录区域起始标记 */
+    private static final Pattern TOC_START = Pattern.compile(
+            "^\\s*(目\\s*录|CONTENTS)\\s*$", Pattern.CASE_INSENSITIVE);
+
+    /** 从目录段落末尾提取页码 */
+    private static final Pattern TOC_PAGE_NUMBER = Pattern.compile("(\\d+)\\s*$");
+
+    /**
+     * 解析文档中的"目录"区域，提取一级条目的标题→页码映射。
+     * 目录条目的 getText() 形如 "1 绪论\t\t1" 或 "第一章 绪论\t\t12"，
+     * 末尾数字即为页码。
+     */
+    private Map<String, Integer> extractTocPageNumbers(String filePath) throws IOException {
+        Map<String, Integer> result = new LinkedHashMap<>();
+
+        try (FileInputStream fis = new FileInputStream(filePath);
+             XWPFDocument doc = new XWPFDocument(fis)) {
+
+            boolean inToc = false;
+
+            for (XWPFParagraph para : doc.getParagraphs()) {
+                String text = para.getText();
+                if (text == null || text.trim().isEmpty()) continue;
+                String trimmed = text.trim();
+
+                if (!inToc) {
+                    if (TOC_START.matcher(trimmed).matches()) {
+                        inToc = true;
+                    }
+                    continue;
+                }
+
+                // 目录结束判定：遇到正文 Heading 样式的章节标题
+                String style = para.getStyle();
+                if (style != null) {
+                    String ls = style.toLowerCase();
+                    boolean isHeadingStyle = ls.contains("heading") || "1".equals(style) || "2".equals(style);
+                    if (isHeadingStyle && CHAPTER_L1.matcher(trimmed).matches()) {
+                        break;
+                    }
+                }
+
+                // 提取末尾页码
+                Matcher pm = TOC_PAGE_NUMBER.matcher(trimmed);
+                if (!pm.find()) continue;
+
+                int pageNum = Integer.parseInt(pm.group(1));
+
+                // 去掉末尾页码、tab、leader dots，保留标题部分
+                String titlePart = trimmed.substring(0, pm.start()).trim();
+                titlePart = titlePart.replaceAll("[\\t.·…]+$", "").trim();
+
+                if (!titlePart.isEmpty() && CHAPTER_L1.matcher(titlePart).matches()) {
+                    result.put(titlePart, pageNum);
                 }
             }
         }
+        return result;
+    }
 
-        // 计算每个一级标题到下一个一级标题之间的段落数
-        for (int i = 0; i < positions.size(); i++) {
-            int start = positions.get(i);
-            int end = (i + 1 < positions.size()) ? positions.get(i + 1) : paragraphs.size();
-            l1Chapters.get(i).setParagraphCount(end - start - 1);
+    /**
+     * 根据标题文本在目录页码映射中查找匹配项。
+     */
+    private Integer findMatchingPageNumber(String chapterTitle, Map<String, Integer> tocPageNumbers) {
+        if (chapterTitle == null) return null;
+        String clean = chapterTitle.trim();
+
+        // 精确匹配
+        if (tocPageNumbers.containsKey(clean)) {
+            return tocPageNumbers.get(clean);
         }
+
+        // 包含匹配
+        for (Map.Entry<String, Integer> entry : tocPageNumbers.entrySet()) {
+            if (entry.getKey().contains(clean) || clean.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     /**

@@ -63,7 +63,7 @@ public class ThesisAnalysisResult {
     public static class ChapterInfo {
         private String title;           // 章节标题
         private int level;              // 层级（1=一级标题, 2=二级, 3=三级）
-        private int paragraphCount;     // 该章节包含的段落数
+        private int pageCount;          // 该章节包含的页数
         private double proportion;      // 占比百分比
     }
 
