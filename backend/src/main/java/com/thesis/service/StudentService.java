@@ -80,14 +80,66 @@ public class StudentService {
 
     /**
      * 编辑学生信息
+     * 若论文题目为空，则尝试从该学生最新的 Word 文件名中提取
      */
     public User updateStudent(Long id, StudentDTO.UpdateRequest request) {
         User user = getStudent(id);
         user.setRealName(request.getRealName());
         user.setEmail(request.getEmail());
-        user.setThesisTitle(request.getThesisTitle());
+
+        String title = request.getThesisTitle();
+        if (title == null || title.trim().isEmpty()) {
+            // 从最新版本文件名提取论文题目
+            title = extractTitleFromLatestVersion(id);
+        }
+        user.setThesisTitle(title);
+
         userMapper.updateById(user);
         return user;
+    }
+
+    /**
+     * 从学生最新版本的文件名中提取论文题目
+     * 文件名格式: 姓名学号_论文题目_日期.ext
+     */
+    private String extractTitleFromLatestVersion(Long studentId) {
+        // 文件名格式: 姓名学号_论文题目_日期[_序号].ext
+        java.util.regex.Pattern filePattern = java.util.regex.Pattern.compile(
+            "^.+?\\d{12}_(.+?)_\\d{8}(?:_\\d+)?\\.(docx?|pdf)$");
+
+        // 查该学生所有论文
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.thesis.entity.Thesis> tw =
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        tw.eq(com.thesis.entity.Thesis::getStudentId, studentId);
+        java.util.List<com.thesis.entity.Thesis> theses = thesisMapper.selectList(tw);
+
+        // 遍历所有论文，取最新版本
+        com.thesis.entity.ThesisVersion latestVersion = null;
+        for (com.thesis.entity.Thesis thesis : theses) {
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.thesis.entity.ThesisVersion> vw =
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            vw.eq(com.thesis.entity.ThesisVersion::getThesisId, thesis.getId())
+              .orderByDesc(com.thesis.entity.ThesisVersion::getCreatedAt)
+              .last("LIMIT 1");
+            com.thesis.entity.ThesisVersion v = thesisVersionMapper.selectOne(vw);
+            if (v != null && (latestVersion == null || v.getCreatedAt().isAfter(latestVersion.getCreatedAt()))) {
+                latestVersion = v;
+            }
+        }
+
+        if (latestVersion == null || latestVersion.getFilePath() == null) {
+            return null;
+        }
+
+        String fileName = new java.io.File(latestVersion.getFilePath()).getName();
+        java.util.regex.Matcher matcher = filePattern.matcher(fileName);
+        if (matcher.matches()) {
+            String title = matcher.group(1);
+            if (!"未命名论文".equals(title)) {
+                return title;
+            }
+        }
+        return null;
     }
 
     /**

@@ -79,7 +79,7 @@
           <el-input v-model="formData.email" placeholder="请输入邮箱（选填）" />
         </el-form-item>
         <el-form-item label="论文题目" prop="thesisTitle">
-          <el-input v-model="formData.thesisTitle" placeholder="请输入论文题目（选填）" />
+          <el-input v-model="formData.thesisTitle" placeholder="留空则自动从文件名提取" />
         </el-form-item>
         <el-form-item v-if="!isEditing" label="密码" prop="password">
           <el-input v-model="formData.password" type="password" show-password placeholder="请输入初始密码" />

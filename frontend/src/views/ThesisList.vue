@@ -33,8 +33,8 @@
             <el-button type="success" @click="handleDirectCompare" :disabled="selectedTheses.length === 0 || selectedTheses.length > 2" :loading="compareLoading">
               论文对比 ({{ selectedTheses.length }}/2)
             </el-button>
-            <el-button type="info" plain @click="openRenameDialog" :disabled="!selectedThesis" v-if="isTeacher">
-              批量重命名
+            <el-button type="info" plain @click="handleBatchRename" :disabled="selectedTheses.length === 0" :loading="renaming" v-if="isTeacher">
+              批量重命名 ({{ selectedTheses.length }})
             </el-button>
 
             <el-divider direction="vertical" v-if="isTeacher" />
@@ -126,7 +126,7 @@
     <!-- 论文分析 Dialog -->
     <el-dialog
       v-model="showAnalysisDialog"
-      title="论文分析"
+      :title="analysisDialogTitle"
       fullscreen
       destroy-on-close
     >
@@ -136,47 +136,7 @@
       />
     </el-dialog>
 
-    <!-- 批量重命名 Dialog -->
-    <el-dialog v-model="showRenameDialog" title="批量重命名" width="700px" destroy-on-close>
-      <div class="rename-info">
-        <span>论文: {{ selectedThesis?.title }}</span>
-        <span class="rename-hint">
-          格式: 姓名+学号_论文题目_日期.ext
-        </span>
-      </div>
-      <el-table
-        :data="renameVersionList"
-        v-loading="renameVersionsLoading"
-        size="small"
-        border
-        stripe
-        @selection-change="handleRenameSelectionChange"
-      >
-        <el-table-column type="selection" width="45" />
-        <el-table-column label="文件名" min-width="180" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ formatFileName(row.filePath) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="fileSize" label="大小" width="100">
-          <template #default="{ row }">
-            {{ formatSize(row.fileSize) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="createdAt" label="上传时间" width="170" />
-      </el-table>
-      <template #footer>
-        <el-button @click="showRenameDialog = false">取消</el-button>
-        <el-button
-          type="primary"
-          :disabled="selectedRenameVersions.length === 0"
-          :loading="renaming"
-          @click="handleBatchRename"
-        >
-          重命名 ({{ selectedRenameVersions.length }})
-        </el-button>
-      </template>
-    </el-dialog>
+
   </div>
 </template>
 
@@ -349,9 +309,29 @@ const handleUpload = async () => {
 
 // ==================== 论文分析 ====================
 const showAnalysisDialog = ref(false)
+const analysisVersionName = ref('')
 
-const openAnalysisDialog = () => {
+const analysisDialogTitle = computed(() => {
+  const title = selectedThesis.value?.title || '论文'
+  return analysisVersionName.value
+    ? `论文分析 - ${analysisVersionName.value}`
+    : `论文分析 - ${title}`
+})
+
+const openAnalysisDialog = async () => {
   if (!selectedThesis.value) return
+  // 获取最新版本文件名
+  try {
+    const res = await getVersions(selectedThesis.value.id)
+    const versions = res.data
+    if (versions && versions.length > 0) {
+      analysisVersionName.value = formatFileName(versions[0].filePath)
+    } else {
+      analysisVersionName.value = ''
+    }
+  } catch {
+    analysisVersionName.value = ''
+  }
   showAnalysisDialog.value = true
 }
 
@@ -424,54 +404,48 @@ const formatSize = (bytes) => {
 
 
 // ==================== 批量重命名 ====================
-const showRenameDialog = ref(false)
-const renameVersionList = ref([])
-const renameVersionsLoading = ref(false)
-const selectedRenameVersions = ref([])
 const renaming = ref(false)
 
-const openRenameDialog = async () => {
-  if (!selectedThesis.value) return
-  showRenameDialog.value = true
-  renameVersionsLoading.value = true
-  selectedRenameVersions.value = []
-  try {
-    const res = await getVersions(selectedThesis.value.id)
-    renameVersionList.value = res.data
-  } catch (error) {
-    console.error(error)
-    renameVersionList.value = []
-  } finally {
-    renameVersionsLoading.value = false
-  }
-}
-
-const handleRenameSelectionChange = (selection) => {
-  selectedRenameVersions.value = selection
-}
-
 const handleBatchRename = async () => {
-  if (!selectedThesis.value) return
-  const thesis = selectedThesis.value
+  if (selectedTheses.value.length === 0) return
+  const theses = selectedTheses.value
   try {
-    await ElMessageBox.confirm(
-      `将选中的 ${selectedRenameVersions.value.length} 个文件重命名为规范格式？`,
-      '批量重命名确认',
-      { type: 'info', confirmButtonText: '确定重命名', cancelButtonText: '取消' }
-    )
-    renaming.value = true
-    const res = await batchRenameFiles({
-      studentId: thesis.studentId,
-      versionIds: selectedRenameVersions.value.map(v => v.id)
-    })
-    const data = res.data
-    ElMessage.success(`重命名完成: 成功 ${data.success} 个, 失败 ${data.failed} 个`)
-    if (data.errors && data.errors.length > 0) {
-      console.warn('重命名错误:', data.errors)
+    // 获取所有选中论文的版本
+    const versionResults = await Promise.all(theses.map(t => getVersions(t.id)))
+    const allVersionIds = []
+    const studentIds = new Set()
+    let totalFiles = 0
+    for (let i = 0; i < theses.length; i++) {
+      const versions = versionResults[i].data || []
+      totalFiles += versions.length
+      studentIds.add(theses[i].studentId)
+      versions.forEach(v => allVersionIds.push({ studentId: theses[i].studentId, versionId: v.id }))
     }
-    // 刷新版本列表
-    const refreshRes = await getVersions(thesis.id)
-    renameVersionList.value = refreshRes.data
+    if (totalFiles === 0) {
+      ElMessage.warning('选中的论文没有可重命名的文件')
+      return
+    }
+    await ElMessageBox.confirm(
+       `确定将 ${theses.length} 篇论文重命名为规范格式：姓名+学号_论文题目_日期.ext？`,
+       '批量重命名',
+       { type: 'info', confirmButtonText: '确定', cancelButtonText: '取消' }
+     )
+    renaming.value = true
+    // 按学生分组调用重命名接口
+    const grouped = {}
+    allVersionIds.forEach(item => {
+      if (!grouped[item.studentId]) grouped[item.studentId] = []
+      grouped[item.studentId].push(item.versionId)
+    })
+    let totalSuccess = 0
+    let totalFailed = 0
+    for (const [studentId, versionIds] of Object.entries(grouped)) {
+      const res = await batchRenameFiles({ studentId: Number(studentId), versionIds })
+      totalSuccess += res.data.success || 0
+      totalFailed += res.data.failed || 0
+      if (res.data.errors?.length > 0) console.warn('重命名错误:', res.data.errors)
+    }
+    ElMessage.success(`重命名完成: 成功 ${totalSuccess} 个, 失败 ${totalFailed} 个`)
     loadTheses()
   } catch (error) {
     if (error !== 'cancel') console.error(error)
@@ -524,22 +498,5 @@ onMounted(() => {
   background-color: #ecf5ff !important;
 }
 
-.rename-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f0f5ff;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #303133;
-}
 
-.rename-hint {
-  font-size: 12px;
-  color: #909399;
-  font-family: monospace;
-}
 </style>
