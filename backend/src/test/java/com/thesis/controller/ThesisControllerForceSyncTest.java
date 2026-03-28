@@ -74,16 +74,18 @@ class ThesisControllerForceSyncTest {
         when(userMapper.selectById(1L)).thenReturn(user);
 
         Map<String, Integer> result = new HashMap<>();
-        result.put("deletedVersions", 2);
-        result.put("deletedTheses", 1);
+        result.put("purgedVersions", 2);
+        result.put("purgedTheses", 1);
+        result.put("newTheses", 10);
+        result.put("newVersions", 10);
         when(fileInitService.forceSyncFromFileSystem()).thenReturn(result);
 
         mockMvc.perform(post("/api/thesis/admin/force-sync")
                         .with(authentication(authWithUserId(1L, "TEACHER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.deletedVersions").value(2))
-                .andExpect(jsonPath("$.data.deletedTheses").value(1));
+                .andExpect(jsonPath("$.data.purgedVersions").value(2))
+                .andExpect(jsonPath("$.data.newTheses").value(10));
 
         verify(fileInitService).forceSyncFromFileSystem();
     }
@@ -96,16 +98,18 @@ class ThesisControllerForceSyncTest {
         when(userMapper.selectById(2L)).thenReturn(user);
 
         Map<String, Integer> result = new HashMap<>();
-        result.put("deletedVersions", 0);
-        result.put("deletedTheses", 0);
+        result.put("purgedVersions", 0);
+        result.put("purgedTheses", 0);
+        result.put("newTheses", 0);
+        result.put("newVersions", 0);
         when(fileInitService.forceSyncFromFileSystem()).thenReturn(result);
 
         mockMvc.perform(post("/api/thesis/admin/force-sync")
                         .with(authentication(authWithUserId(2L, "ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.deletedVersions").value(0))
-                .andExpect(jsonPath("$.data.deletedTheses").value(0));
+                .andExpect(jsonPath("$.data.purgedVersions").value(0))
+                .andExpect(jsonPath("$.data.newTheses").value(0));
 
         verify(fileInitService).forceSyncFromFileSystem();
     }

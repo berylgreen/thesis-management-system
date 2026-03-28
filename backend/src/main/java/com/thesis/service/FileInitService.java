@@ -271,85 +271,42 @@ public class FileInitService implements CommandLineRunner {
     }
 
     /**
-     * 强制同步：以文件系统为准更新数据库
-     * 1. 删除数据库中文件已不存在的版本记录
-     * 2. 添加新发现的文件
+     * 强制同步：以文件系统为唯一数据源，完全重建数据库
+     * 1. 物理清空 t_thesis_version 和 t_thesis 表
+     * 2. 从文件系统完整扫描重建所有记录
+     * 3. 初始化论文标题
      * @return 同步统计结果
      */
     @Transactional
     public java.util.Map<String, Integer> forceSyncFromFileSystem() throws IOException {
-        log.info("开始强制同步文件系统到数据库...");
+        log.info("开始强制同步：以文件系统为准完全重建数据库...");
 
-        // 0. 物理删除软删除的版本记录（清除唯一约束中的僵尸数据）
-        int purged = thesisVersionMapper.physicalDeleteSoftDeleted();
-        if (purged > 0) {
-            log.info("物理清除 {} 条软删除版本记录", purged);
-        }
-        
-        int deletedVersions = 0;
-        int deletedTheses = 0;
-        
-        // 1. 获取数据库中所有版本记录
-        List<ThesisVersion> allVersions = thesisVersionMapper.selectList(null);
-        
-        for (ThesisVersion version : allVersions) {
-            String filePath = version.getFilePath();
-            if (filePath == null || filePath.isEmpty()) continue;
-            
-            File file = new File(filePath);
-            if (!file.exists()) {
-                log.info("文件不存在，删除版本记录: {} (ID: {})", filePath, version.getId());
-                thesisVersionMapper.deleteById(version.getId());
-                deletedVersions++;
-            }
-        }
-        
-        // 2. 检查没有任何版本的论文，删除它们
-        List<Thesis> allTheses = thesisMapper.selectList(null);
-        for (Thesis thesis : allTheses) {
-            LambdaQueryWrapper<ThesisVersion> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(ThesisVersion::getThesisId, thesis.getId());
-            Long versionCount = thesisVersionMapper.selectCount(wrapper);
-            
-            if (versionCount == 0) {
-                log.info("论文无版本记录，删除: {} (ID: {})", thesis.getTitle(), thesis.getId());
-                thesisMapper.deleteById(thesis.getId());
-                deletedTheses++;
-            } else {
-                // 从最新版本文件名提取标题，同步更新论文标题
-                wrapper.orderByDesc(ThesisVersion::getCreatedAt);
-                ThesisVersion latestVersion = thesisVersionMapper.selectOne(wrapper.last("LIMIT 1"));
-                boolean needUpdate = false;
+        // 1. 物理清空版本表（先删版本，因外键约束）
+        int purgedVersions = thesisVersionMapper.physicalDeleteAll();
+        log.info("物理清除 {} 条版本记录", purgedVersions);
 
-                if (latestVersion != null) {
-                    String newTitle = extractTitleFromFilePath(latestVersion.getFilePath());
-                    if (newTitle != null && !newTitle.equals(thesis.getTitle())) {
-                        log.info("更新论文标题: {} -> {} (ID: {})", thesis.getTitle(), newTitle, thesis.getId());
-                        thesis.setTitle(newTitle);
-                        needUpdate = true;
-                    }
-                }
+        // 2. 物理清空论文表
+        int purgedTheses = thesisMapper.physicalDeleteAll();
+        log.info("物理清除 {} 条论文记录", purgedTheses);
 
-                if (needUpdate) {
-                    thesisMapper.updateById(thesis);
-                }
-            }
-        }
-        
-        log.info("清理完成: 删除 {} 个版本记录, {} 篇空论文", deletedVersions, deletedTheses);
-
-        // 不再合并同标题论文，每个文件独立显示
-        int mergedTheses = 0;
-
-        // 3. 调用现有扫描逻辑添加新文件
+        // 3. 从文件系统完整扫描重建
         scanAndInitialize();
-        
+
+        // 4. 重新初始化论文标题
+        initThesisTitles();
+
+        // 5. 统计重建后的记录数
+        long newTheses = thesisMapper.selectCount(null);
+        long newVersions = thesisVersionMapper.selectCount(null);
+
         java.util.Map<String, Integer> result = new java.util.HashMap<>();
-        result.put("deletedVersions", deletedVersions);
-        result.put("deletedTheses", deletedTheses);
-        result.put("mergedTheses", mergedTheses);
-        
-        log.info("强制同步完成!");
+        result.put("purgedVersions", purgedVersions);
+        result.put("purgedTheses", purgedTheses);
+        result.put("newTheses", (int) newTheses);
+        result.put("newVersions", (int) newVersions);
+
+        log.info("强制同步完成! 清除: {} 论文 + {} 版本, 重建: {} 论文 + {} 版本",
+                purgedTheses, purgedVersions, newTheses, newVersions);
         return result;
     }
 

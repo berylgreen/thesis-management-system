@@ -288,11 +288,23 @@ const handleCreate = async () => {
 
 // ==================== 强制同步 ====================
 const handleForceSync = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '强制更新将清空所有论文数据并从文件系统完全重建，确定继续？',
+      '强制更新',
+      { type: 'warning', confirmButtonText: '确定重建', cancelButtonText: '取消' }
+    )
+  } catch {
+    return // 用户取消
+  }
+
   isSyncing.value = true
   try {
     const res = await forceSync()
     const data = res.data
-    ElMessage.success(`同步完成！删除 ${data.deletedVersions || 0} 个版本, ${data.deletedTheses || 0} 篇论文`)
+    ElMessage.success(
+      `重建完成！清除 ${data.purgedTheses || 0} 篇旧记录，重建 ${data.newTheses || 0} 篇论文`
+    )
     loadTheses()
   } catch (error) {
     ElMessage.error('同步失败: ' + (error.message || '未知错误'))

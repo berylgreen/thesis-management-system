@@ -1,8 +1,15 @@
 -- H2 兼容版 schema（MODE=MySQL）
--- 原始 MySQL DDL 移除了 ENGINE=InnoDB、CHARSET、COLLATE、COMMENT 等 MySQL 专属语法
+-- 每次启动时重建表结构，确保与实体类一致
+-- 数据由 FileInitService 从文件系统自动重建
+
+-- 按外键依赖倒序删除
+DROP TABLE IF EXISTS t_review;
+DROP TABLE IF EXISTS t_thesis_version;
+DROP TABLE IF EXISTS t_thesis;
+DROP TABLE IF EXISTS t_user;
 
 -- 用户表
-CREATE TABLE IF NOT EXISTS t_user (
+CREATE TABLE t_user (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
@@ -14,11 +21,11 @@ CREATE TABLE IF NOT EXISTS t_user (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted TINYINT DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_user_username ON t_user(username);
-CREATE INDEX IF NOT EXISTS idx_user_role ON t_user(role);
+CREATE INDEX idx_user_username ON t_user(username);
+CREATE INDEX idx_user_role ON t_user(role);
 
 -- 论文表
-CREATE TABLE IF NOT EXISTS t_thesis (
+CREATE TABLE t_thesis (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     student_id BIGINT NOT NULL,
     title VARCHAR(200) NOT NULL,
@@ -27,10 +34,10 @@ CREATE TABLE IF NOT EXISTS t_thesis (
     deleted TINYINT DEFAULT 0,
     FOREIGN KEY (student_id) REFERENCES t_user(id)
 );
-CREATE INDEX IF NOT EXISTS idx_thesis_student_id ON t_thesis(student_id);
+CREATE INDEX idx_thesis_student_id ON t_thesis(student_id);
 
 -- 论文版本表
-CREATE TABLE IF NOT EXISTS t_thesis_version (
+CREATE TABLE t_thesis_version (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     thesis_id BIGINT NOT NULL,
     file_path VARCHAR(500) NOT NULL,
@@ -41,10 +48,10 @@ CREATE TABLE IF NOT EXISTS t_thesis_version (
     deleted TINYINT DEFAULT 0,
     FOREIGN KEY (thesis_id) REFERENCES t_thesis(id)
 );
-CREATE INDEX IF NOT EXISTS idx_version_thesis_id ON t_thesis_version(thesis_id);
+CREATE INDEX idx_version_thesis_id ON t_thesis_version(thesis_id);
 
 -- 批改表
-CREATE TABLE IF NOT EXISTS t_review (
+CREATE TABLE t_review (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     version_id BIGINT NOT NULL,
     teacher_id BIGINT NOT NULL,
@@ -57,5 +64,6 @@ CREATE TABLE IF NOT EXISTS t_review (
     FOREIGN KEY (version_id) REFERENCES t_thesis_version(id),
     FOREIGN KEY (teacher_id) REFERENCES t_user(id)
 );
-CREATE INDEX IF NOT EXISTS idx_review_version_id ON t_review(version_id);
-CREATE INDEX IF NOT EXISTS idx_review_teacher_id ON t_review(teacher_id);
+CREATE INDEX idx_review_version_id ON t_review(version_id);
+CREATE INDEX idx_review_teacher_id ON t_review(teacher_id);
+

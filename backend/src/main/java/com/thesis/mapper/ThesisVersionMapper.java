@@ -14,4 +14,11 @@ public interface ThesisVersionMapper extends BaseMapper<ThesisVersion> {
      */
     @Delete("DELETE FROM t_thesis_version WHERE deleted = 1")
     int physicalDeleteSoftDeleted();
+
+    /**
+     * 物理删除所有版本记录（含软删除的），用于强制重建
+     * @return 删除的行数
+     */
+    @Delete("DELETE FROM t_thesis_version")
+    int physicalDeleteAll();
 }
